@@ -245,18 +245,18 @@ kbd { display: inline-block; min-width: 19px; padding: 2px 5px; border: 1px soli
 .timing-icon-legend { display: flex; gap: 7px; color: #758078; font-size: 7px; }
 .timing-icon-legend span { white-space: nowrap; }
 .timing-icon-legend b { margin-right: 2px; color: var(--accent-soft); }
-.quick-schedule-controls { display: grid; grid-template-columns: 70px 92px minmax(105px,1fr) 82px; align-items: end; gap: 6px; margin-top: 10px; }
+.quick-schedule-controls { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); align-items: end; gap: 8px; margin-top: 10px; }
 .quick-schedule-controls label > span { display: block; margin-bottom: 4px; color: #7d8880; font-size: 7px; }
 .quick-schedule-controls input:not([type="checkbox"]) { padding: 7px 6px !important; font-family: var(--font-geist-mono), monospace; font-size: 9px !important; }
 .quick-schedule-controls .preserve-pass-toggle { min-height: 30px; display: flex; align-items: center; gap: 5px; }
 .quick-schedule-controls .preserve-pass-toggle > span { margin: 0; color: #8d9890; font-size: 8px; }
 .quick-schedule-controls .preserve-pass-toggle input { accent-color: var(--teal); }
-.quick-schedule-controls button { min-height: 30px; border: 1px solid rgba(99,197,179,.38); border-radius: 4px; color: #b9ddd4; background: rgba(99,197,179,.08); font-size: 8px; cursor: pointer; }
+.quick-schedule-controls button { width: 100%; min-height: 30px; border: 1px solid rgba(99,197,179,.38); border-radius: 4px; color: #b9ddd4; background: rgba(99,197,179,.08); font-size: 8px; cursor: pointer; }
 .quick-schedule-card > p { margin: 8px 0 0; color: #91bdb2; font-size: 8px; }
 .timing-table-head { display: grid; grid-template-columns: minmax(70px,1fr) 82px 146px; gap: 6px; padding: 0 6px 7px; color: #636c65; font-size: 8px; text-transform: uppercase; letter-spacing: .08em; }
 .timing-list { position: relative; border-top: 1px solid var(--line); }
 .timing-list::before { content: ""; position: absolute; left: 12px; top: 20px; bottom: 20px; width: 1px; background: rgba(237,157,93,.24); }
-.timing-row { min-height: 55px; display: grid; grid-template-columns: minmax(70px,1fr) 82px 146px; align-items: center; gap: 6px; padding: 7px 5px; border-bottom: 1px solid var(--line); }
+.timing-row { min-height: 55px; display: grid; grid-template-columns: minmax(70px,1fr) 82px 146px; align-items: center; gap: 6px; padding: 8px 5px; border-bottom: 1px solid var(--line); }
 .timing-mode-group { height: 31px; display: grid; grid-template-columns: repeat(3,1fr); gap: 2px; padding: 2px; border: 1px solid var(--line); border-radius: 5px; background: #151815; }
 .timing-mode-group button { border: 0; border-radius: 3px; color: #69736b; background: transparent; font-size: 10px; cursor: pointer; }
 .timing-mode-group button:hover { color: #c7cfc8; background: rgba(255,255,255,.04); }
@@ -266,7 +266,10 @@ kbd { display: inline-block; min-width: 19px; padding: 2px 5px; border: 1px soli
 .timing-station strong, .timing-station small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .timing-station strong { color: #d9dfd9; font-size: 10px; }
 .timing-station small { margin-top: 3px; color: #646d66; font-size: 8px; }
-.timing-station .interval-speed { color: #87b9ad; font-family: var(--font-geist-mono), monospace; font-size: 7px; }
+.interval-speed { grid-column: 1 / -1; min-width: 0; display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 7px; margin: 1px 0 2px 20px; padding: 5px 7px; border-left: 2px solid rgba(99,197,179,.48); color: #87b9ad; background: rgba(99,197,179,.045); }
+.interval-speed span { color: #657169; font-size: 7px; letter-spacing: .05em; }
+.interval-speed strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9dc9bf; font-size: 8px; font-weight: 600; }
+.interval-speed b { white-space: nowrap; color: #b8ddd4; font-family: var(--font-geist-mono), monospace; font-size: 9px; }
 .timing-inputs { display: flex; align-items: center; gap: 3px; }
 .timing-inputs .time-offset { min-width: 0; padding: 6px 4px; font-size: 9px; }
 .timing-inputs > span { color: #626b64; font-size: 8px; }

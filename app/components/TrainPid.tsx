@@ -44,7 +44,10 @@ export function TrainPid({
     });
     const nextIndex = currentIndex >= 0
       ? currentIndex
-      : route.stations.findIndex((_, index) => resolved[index].arrival >= relativeTime);
+      : route.stations.findIndex((station, index) => {
+        const rule = service.timings[station.occurrenceKey];
+        return rule?.mode === "stop" && resolved[index].arrival >= relativeTime;
+      });
     const focusIndex = nextIndex >= 0 ? nextIndex : route.stations.length - 1;
     const focusStation = route.stations[focusIndex];
     const usedLineIds = focusStation
@@ -126,7 +129,7 @@ export function TrainPid({
                     key={station.occurrenceKey}
                   >
                     <strong>{model.stationMap.get(station.stationId)?.name ?? "已删除"}</strong>
-                    <span className="pid-route-node">{passed ? "✓" : index >= model.focusIndex ? upcomingMinutes : ""}</span>
+                    <span className="pid-route-node">{passed ? "✓" : !isPass && index >= model.focusIndex ? upcomingMinutes : ""}</span>
                     <small>{isPass ? "通过" : index === model.focusIndex ? "下一站" : "停靠"}</small>
                   </div>
                 );

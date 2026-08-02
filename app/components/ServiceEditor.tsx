@@ -319,7 +319,6 @@ export function ServiceEditor({
                     <span className="route-node" />
                     <strong>{stationMap.get(routeStation.stationId)?.name ?? "已删除"}</strong>
                     <small>{Math.round(routeStation.distance)} m</small>
-                    {interval && nextIntervalStation && <small className="interval-speed">→ {stationMap.get(nextIntervalStation.stationId)?.name} · {interval.speedKmh.toFixed(1)} km/h</small>}
                   </div>
                   <div className="timing-mode-group" role="group" aria-label={`${stationMap.get(routeStation.stationId)?.name}停靠模式`}>
                     <button type="button" aria-pressed={rule.mode === "stop"} className={rule.mode === "stop" ? "active" : ""} title="停靠" aria-label="停靠" onClick={() => setMode("stop")}>●</button>
@@ -337,6 +336,13 @@ export function ServiceEditor({
                     {rule.mode === "pass-exact" && durationInput(rule.pass, (pass) => setTiming(routeStation.occurrenceKey, { ...rule, pass }), "相对通过时间")}
                     {rule.mode === "pass-flexible" && <span className="free-time">自动求解</span>}
                   </div>
+                  {interval && nextIntervalStation && (
+                    <div className="interval-speed">
+                      <span>下一定时区间</span>
+                      <strong>至 {stationMap.get(nextIntervalStation.stationId)?.name}</strong>
+                      <b>{interval.speedKmh.toFixed(1)} km/h</b>
+                    </div>
+                  )}
                 </div>
               );
             })}
