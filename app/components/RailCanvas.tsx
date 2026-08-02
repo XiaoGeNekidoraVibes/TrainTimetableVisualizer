@@ -53,6 +53,9 @@ const WORLD_WIDTH = 1020;
 const WORLD_HEIGHT = 720;
 const OSM_TILE_SIZE = 256;
 const OSM_BASE_ZOOM = 13;
+const OSM_MIN_ZOOM = 2;
+const OSM_MAX_ZOOM = 19;
+const EARTH_CIRCUMFERENCE_METERS = 40_075_016.686;
 const OSM_CENTER = { longitude: 121.4737, latitude: 31.2304 };
 const osmTileCache = new Map<string, HTMLImageElement | null>();
 
@@ -66,10 +69,15 @@ function latitudeToPixel(latitude: number, zoom: number) {
     * OSM_TILE_SIZE * 2 ** zoom;
 }
 
-const osmBaseOrigin = {
-  x: longitudeToPixel(OSM_CENTER.longitude, OSM_BASE_ZOOM) - WORLD_WIDTH / 2,
-  y: latitudeToPixel(OSM_CENTER.latitude, OSM_BASE_ZOOM) - WORLD_HEIGHT / 2,
-};
+const OSM_REFERENCE_METERS_PER_PIXEL = Math.cos((OSM_CENTER.latitude * Math.PI) / 180)
+  * EARTH_CIRCUMFERENCE_METERS / (OSM_TILE_SIZE * 2 ** OSM_BASE_ZOOM);
+const OSM_REFERENCE_SCALE = 1 / OSM_REFERENCE_METERS_PER_PIXEL;
+const MIN_CAMERA_SCALE = OSM_REFERENCE_SCALE * 2 ** (OSM_MIN_ZOOM - OSM_BASE_ZOOM);
+const MAX_CAMERA_SCALE = OSM_REFERENCE_SCALE * 2 ** (OSM_MAX_ZOOM - OSM_BASE_ZOOM);
+
+function cameraScaleForMapZoom(zoom: number) {
+  return OSM_REFERENCE_SCALE * 2 ** (zoom - OSM_BASE_ZOOM);
+}
 
 function getOsmTile(zoom: number, x: number, y: number) {
   const tilesPerAxis = 2 ** zoom;
@@ -94,17 +102,26 @@ function drawOsmBaseMap(
   camera: Camera,
   opacity: number,
 ) {
-  const zoom = Math.max(2, Math.min(19, Math.round(OSM_BASE_ZOOM + Math.log2(camera.scale))));
-  const zoomFactor = 2 ** (zoom - OSM_BASE_ZOOM);
+  const zoom = Math.max(OSM_MIN_ZOOM, Math.min(
+    OSM_MAX_ZOOM,
+    Math.round(OSM_BASE_ZOOM + Math.log2(camera.scale / OSM_REFERENCE_SCALE)),
+  ));
+  const metresPerPixel = Math.cos((OSM_CENTER.latitude * Math.PI) / 180)
+    * EARTH_CIRCUMFERENCE_METERS / (OSM_TILE_SIZE * 2 ** zoom);
+  const centerPixel = {
+    x: longitudeToPixel(OSM_CENTER.longitude, zoom),
+    y: latitudeToPixel(OSM_CENTER.latitude, zoom),
+  };
   const left = -camera.x / camera.scale;
   const top = -camera.y / camera.scale;
   const right = (width - camera.x) / camera.scale;
   const bottom = (height - camera.y) / camera.scale;
-  const startX = Math.floor(((osmBaseOrigin.x + left) * zoomFactor) / OSM_TILE_SIZE);
-  const endX = Math.floor(((osmBaseOrigin.x + right) * zoomFactor) / OSM_TILE_SIZE);
-  const startY = Math.floor(((osmBaseOrigin.y + top) * zoomFactor) / OSM_TILE_SIZE);
-  const endY = Math.floor(((osmBaseOrigin.y + bottom) * zoomFactor) / OSM_TILE_SIZE);
-  const worldTileSize = OSM_TILE_SIZE / zoomFactor;
+  const worldCenter = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 };
+  const startX = Math.floor((centerPixel.x + (left - worldCenter.x) / metresPerPixel) / OSM_TILE_SIZE);
+  const endX = Math.floor((centerPixel.x + (right - worldCenter.x) / metresPerPixel) / OSM_TILE_SIZE);
+  const startY = Math.floor((centerPixel.y + (top - worldCenter.y) / metresPerPixel) / OSM_TILE_SIZE);
+  const endY = Math.floor((centerPixel.y + (bottom - worldCenter.y) / metresPerPixel) / OSM_TILE_SIZE);
+  const worldTileSize = OSM_TILE_SIZE * metresPerPixel;
 
   ctx.save();
   ctx.globalAlpha = opacity;
@@ -114,8 +131,8 @@ function drawOsmBaseMap(
       if (!tile?.complete || !tile.naturalWidth) continue;
       ctx.drawImage(
         tile,
-        (tileX * OSM_TILE_SIZE) / zoomFactor - osmBaseOrigin.x,
-        (tileY * OSM_TILE_SIZE) / zoomFactor - osmBaseOrigin.y,
+        worldCenter.x + (tileX * OSM_TILE_SIZE - centerPixel.x) * metresPerPixel,
+        worldCenter.y + (tileY * OSM_TILE_SIZE - centerPixel.y) * metresPerPixel,
         worldTileSize + 0.5,
         worldTileSize + 0.5,
       );
@@ -140,7 +157,11 @@ function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number, 
   ctx.save();
   ctx.strokeStyle = "rgba(221, 229, 218, 0.055)";
   ctx.lineWidth = 1;
-  const spacing = 44 * camera.scale;
+  const desiredWorldSpacing = 58 / camera.scale;
+  const magnitude = 10 ** Math.floor(Math.log10(desiredWorldSpacing));
+  const normalized = desiredWorldSpacing / magnitude;
+  const niceMultiplier = normalized <= 1 ? 1 : normalized <= 2 ? 2 : normalized <= 5 ? 5 : 10;
+  const spacing = niceMultiplier * magnitude * camera.scale;
   const offsetX = ((camera.x % spacing) + spacing) % spacing;
   const offsetY = ((camera.y % spacing) + spacing) % spacing;
   ctx.beginPath();
@@ -461,13 +482,26 @@ export function RailCanvas({
     const point = eventPoint(event, canvas);
     const camera = cameraRef.current;
     const before = screenToWorld(point, camera);
-    const factor = Math.exp(-event.deltaY * 0.001);
-    camera.scale = Math.max(0.38, Math.min(3.2, camera.scale * factor));
+    const factor = Math.exp(-event.deltaY * 0.0022);
+    camera.scale = Math.max(MIN_CAMERA_SCALE, Math.min(MAX_CAMERA_SCALE, camera.scale * factor));
+    camera.x = point.x - before.x * camera.scale;
+    camera.y = point.y - before.y * camera.scale;
+  };
+
+  const zoomAtViewportCenter = (nextScale: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const bounds = canvas.getBoundingClientRect();
+    const point = { x: bounds.width / 2, y: bounds.height / 2 };
+    const camera = cameraRef.current;
+    const before = screenToWorld(point, camera);
+    camera.scale = Math.max(MIN_CAMERA_SCALE, Math.min(MAX_CAMERA_SCALE, nextScale));
     camera.x = point.x - before.x * camera.scale;
     camera.y = point.y - before.y * camera.scale;
   };
 
   return (
+    <>
     <canvas
       ref={canvasRef}
       className={`rail-canvas tool-${tool}`}
@@ -480,5 +514,13 @@ export function RailCanvas({
       }}
       onWheel={handleWheel}
     />
+    {showOsm && (
+      <div className="canvas-zoom-controls" aria-label="地图缩放">
+        <button type="button" aria-label="放大地图" title="放大" onClick={() => zoomAtViewportCenter(cameraRef.current.scale * 2)}>＋</button>
+        <button type="button" aria-label="缩小地图" title="缩小" onClick={() => zoomAtViewportCenter(cameraRef.current.scale / 2)}>−</button>
+        <button type="button" className="intercontinental-zoom" title="快速缩放到洲际范围" onClick={() => zoomAtViewportCenter(cameraScaleForMapZoom(4))}>洲际</button>
+      </div>
+    )}
+    </>
   );
 }

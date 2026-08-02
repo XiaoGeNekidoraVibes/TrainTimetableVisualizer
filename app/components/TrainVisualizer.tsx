@@ -393,7 +393,7 @@ export function TrainVisualizer() {
         <div className="map-controls" aria-label="地图底图设置">
           <label className="map-toggle">
             <input type="checkbox" checked={showOsm} onChange={(event) => setShowOsm(event.target.checked)} />
-            <span>OSM 底图</span>
+            <span>OSM · 米制底图</span>
           </label>
           {showOsm && (
             <label className="map-opacity">
