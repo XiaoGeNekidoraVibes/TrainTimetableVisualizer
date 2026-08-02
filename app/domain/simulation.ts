@@ -1,4 +1,5 @@
 import { pointAtDistance } from "./geometry";
+import { normalizeTimeOfDay } from "../lib/time";
 import type {
   CompiledRoute,
   Service,
@@ -162,6 +163,7 @@ export function collectActiveTrains(
   clockSeconds: number,
 ): TrainRenderState[] {
   const result: TrainRenderState[] = [];
+  const timeOfDay = normalizeTimeOfDay(clockSeconds);
   for (const service of services) {
     const route = compiledRoutes.get(service.id);
     if (!route?.valid) continue;
@@ -169,7 +171,7 @@ export function collectActiveTrains(
     if (runtime.error) continue;
     for (let departureIndex = 0; departureIndex < service.departures.length; departureIndex += 1) {
       const departure = service.departures[departureIndex];
-      let relativeTime = clockSeconds - departure;
+      let relativeTime = timeOfDay - departure;
       if (relativeTime < -43200) relativeTime += 86400;
       const position = positionAtRelativeTime(route, runtime.anchors, relativeTime);
       if (!position) continue;

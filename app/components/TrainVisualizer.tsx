@@ -14,7 +14,7 @@ import type {
   Station,
   ToolMode,
 } from "../domain/types";
-import { formatTime, parseClock } from "../lib/time";
+import { formatTime, normalizeTimeOfDay, parseClock } from "../lib/time";
 import { Inspector } from "./Inspector";
 import { RailCanvas } from "./RailCanvas";
 import { ServiceLibrary } from "./ServiceLibrary";
@@ -79,12 +79,14 @@ function useSimulationClock(initialSeconds: number) {
   const getSeconds = useCallback(() => {
     const current = runtime.current;
     if (current.baseRealTime === 0) current.baseRealTime = performance.now();
-    if (!current.playing) return current.baseSeconds;
-    return current.baseSeconds + ((performance.now() - current.baseRealTime) / 1000) * current.speed;
+    if (!current.playing) return normalizeTimeOfDay(current.baseSeconds);
+    return normalizeTimeOfDay(
+      current.baseSeconds + ((performance.now() - current.baseRealTime) / 1000) * current.speed,
+    );
   }, []);
 
   const setSeconds = useCallback((seconds: number) => {
-    runtime.current.baseSeconds = ((seconds % 86400) + 86400) % 86400;
+    runtime.current.baseSeconds = normalizeTimeOfDay(seconds);
     runtime.current.baseRealTime = performance.now();
     setDisplaySeconds(runtime.current.baseSeconds);
   }, []);

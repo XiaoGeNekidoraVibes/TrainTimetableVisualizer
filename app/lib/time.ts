@@ -1,5 +1,9 @@
+export function normalizeTimeOfDay(totalSeconds: number) {
+  return ((totalSeconds % 86400) + 86400) % 86400;
+}
+
 export function formatTime(totalSeconds: number, includeSeconds = true) {
-  const normalized = ((Math.floor(totalSeconds) % 86400) + 86400) % 86400;
+  const normalized = Math.floor(normalizeTimeOfDay(totalSeconds));
   const hours = Math.floor(normalized / 3600);
   const minutes = Math.floor((normalized % 3600) / 60);
   const seconds = normalized % 60;
