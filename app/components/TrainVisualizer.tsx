@@ -16,6 +16,7 @@ import { formatTime, parseClock } from "../lib/time";
 import { Inspector } from "./Inspector";
 import { RailCanvas } from "./RailCanvas";
 import { StationDisplay } from "./StationDisplay";
+import { TrainPid } from "./TrainPid";
 
 const LINE_COLORS = ["#e8834d", "#42a99a", "#d8b557", "#7c92df", "#c96b86"];
 const makeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -95,6 +96,9 @@ export function TrainVisualizer() {
     ),
     [network],
   );
+  const selectedTrainService = selection?.type === "train"
+    ? network.services.find((service) => service.id === selection.serviceId)
+    : undefined;
 
   const selectTool = (next: ToolMode) => {
     setTool(next);
@@ -331,6 +335,18 @@ export function TrainVisualizer() {
           onAppendDraftStation={(stationId) => setDraftStationIds((current) => current.at(-1) === stationId || current.includes(stationId) ? current : [...current, stationId])}
           onActiveCountChange={setActiveCount}
         />
+        {selection?.type === "train" && selectedTrainService && compiledRoutes.get(selectedTrainService.id)?.valid && (
+          <TrainPid
+            trainId={selection.id}
+            departureIndex={selection.departureIndex}
+            service={selectedTrainService}
+            route={compiledRoutes.get(selectedTrainService.id)!}
+            stations={network.stations}
+            lines={network.lines}
+            clockSeconds={((clock.displaySeconds % 86400) + 86400) % 86400}
+            onClose={() => setSelection(null)}
+          />
+        )}
         <div className="canvas-status">
           <span>{notice}</span>
           <div><kbd>滚轮</kbd> 缩放 <kbd>拖动</kbd> 平移</div>

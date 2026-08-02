@@ -10,6 +10,7 @@ import type {
   TimingRule,
 } from "../domain/types";
 import { validateSchedule } from "../domain/simulation";
+import { createUniformSchedule, getTimingIntervals } from "../domain/schedule";
 import {
   createDepartureRange,
   formatDuration,
@@ -70,9 +71,14 @@ export function ServiceEditor({
   const [rangeEnd, setRangeEnd] = useState("23:00:00");
   const [rangeInterval, setRangeInterval] = useState("00:30:00");
   const [rangeError, setRangeError] = useState<string | null>(null);
+  const [quickSpeed, setQuickSpeed] = useState("80");
+  const [quickDwell, setQuickDwell] = useState("00:01:00");
+  const [preservePassRules, setPreservePassRules] = useState(true);
+  const [quickMessage, setQuickMessage] = useState<string | null>(null);
 
   const stationMap = new Map(stations.map((station) => [station.id, station]));
   const error = validateSchedule(service, route);
+  const timingIntervals = route.valid ? getTimingIntervals(service, route) : new Map();
 
   const updateLeg = (legId: string, patch: Partial<RouteLeg>) => {
     const nextLegs = service.routeLegs.map((leg) => {
@@ -128,6 +134,20 @@ export function ServiceEditor({
     onChange({ ...service, departures });
     setDepartureText(departures.map((time) => formatTime(time)).join(", "));
     setRangeError(null);
+  };
+
+  const applyUniformSchedule = () => {
+    const speed = Number(quickSpeed);
+    const dwell = parseDuration(quickDwell);
+    if (!Number.isFinite(speed) || speed <= 0 || dwell === null) {
+      setQuickMessage("请输入有效的均速和停车时长");
+      return;
+    }
+    onChange({
+      ...service,
+      timings: createUniformSchedule(service, route, speed, dwell, preservePassRules),
+    });
+    setQuickMessage(`已按 ${speed} km/h 配置；停车 ${formatDuration(dwell)}`);
   };
 
   return (
@@ -264,6 +284,19 @@ export function ServiceEditor({
             </div>
             <span className="unit-badge">相对发车时间 · HH:MM:SS</span>
           </div>
+          <div className="quick-schedule-card">
+            <div className="quick-schedule-heading">
+              <div><strong>均速快速配置</strong><span>按线路几何距离自动生成基础时刻</span></div>
+              <div className="timing-icon-legend"><span><b>●</b>停靠</span><span><b>◆</b>定时通过</span><span><b>◇</b>自由通过</span></div>
+            </div>
+            <div className="quick-schedule-controls">
+              <label><span>均速 km/h</span><input type="number" min="1" step="1" value={quickSpeed} onChange={(event) => setQuickSpeed(event.target.value)} /></label>
+              <label><span>停车时长</span><input type="text" inputMode="numeric" value={quickDwell} onChange={(event) => setQuickDwell(event.target.value)} /></label>
+              <label className="preserve-pass-toggle"><input type="checkbox" checked={preservePassRules} onChange={(event) => setPreservePassRules(event.target.checked)} /><span>保留现有通过站</span></label>
+              <button type="button" onClick={applyUniformSchedule}>应用到全线</button>
+            </div>
+            {quickMessage && <p>{quickMessage}</p>}
+          </div>
           <div className="timing-table-head">
             <span>站点</span><span>模式</span><span>时间</span>
           </div>
@@ -271,26 +304,28 @@ export function ServiceEditor({
             {route.stations.map((routeStation, index) => {
               const rule = service.timings[routeStation.occurrenceKey] ?? { mode: "pass-flexible" as const };
               const defaultTime = Math.round((index / Math.max(1, route.stations.length - 1)) * 1800);
+              const interval = timingIntervals.get(routeStation.occurrenceKey);
+              const nextIntervalStation = interval
+                ? route.stations.find((station) => station.occurrenceKey === interval.nextOccurrenceKey)
+                : undefined;
+              const setMode = (mode: TimingRule["mode"]) => {
+                if (mode === "stop") setTiming(routeStation.occurrenceKey, { mode, arrival: defaultTime, departure: defaultTime + (index ? 60 : 0) });
+                else if (mode === "pass-exact") setTiming(routeStation.occurrenceKey, { mode, pass: defaultTime });
+                else setTiming(routeStation.occurrenceKey, { mode });
+              };
               return (
                 <div className="timing-row" key={routeStation.occurrenceKey}>
                   <div className="timing-station">
                     <span className="route-node" />
                     <strong>{stationMap.get(routeStation.stationId)?.name ?? "已删除"}</strong>
                     <small>{Math.round(routeStation.distance)} m</small>
+                    {interval && nextIntervalStation && <small className="interval-speed">→ {stationMap.get(nextIntervalStation.stationId)?.name} · {interval.speedKmh.toFixed(1)} km/h</small>}
                   </div>
-                  <select
-                    value={rule.mode}
-                    onChange={(event) => {
-                      const mode = event.target.value as TimingRule["mode"];
-                      if (mode === "stop") setTiming(routeStation.occurrenceKey, { mode, arrival: defaultTime, departure: defaultTime + (index ? 60 : 0) });
-                      else if (mode === "pass-exact") setTiming(routeStation.occurrenceKey, { mode, pass: defaultTime });
-                      else setTiming(routeStation.occurrenceKey, { mode });
-                    }}
-                  >
-                    <option value="stop">停靠</option>
-                    <option value="pass-exact">定时通过</option>
-                    <option value="pass-flexible">自由通过</option>
-                  </select>
+                  <div className="timing-mode-group" role="group" aria-label={`${stationMap.get(routeStation.stationId)?.name}停靠模式`}>
+                    <button type="button" aria-pressed={rule.mode === "stop"} className={rule.mode === "stop" ? "active" : ""} title="停靠" aria-label="停靠" onClick={() => setMode("stop")}>●</button>
+                    <button type="button" aria-pressed={rule.mode === "pass-exact"} className={rule.mode === "pass-exact" ? "active" : ""} title="定时通过" aria-label="定时通过" onClick={() => setMode("pass-exact")}>◆</button>
+                    <button type="button" aria-pressed={rule.mode === "pass-flexible"} className={rule.mode === "pass-flexible" ? "active" : ""} title="自由通过" aria-label="自由通过" onClick={() => setMode("pass-flexible")}>◇</button>
+                  </div>
                   <div className="timing-inputs">
                     {rule.mode === "stop" && (
                       <>

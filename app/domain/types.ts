@@ -55,6 +55,7 @@ export type TrainRenderState = {
   key: string;
   id: string;
   serviceId: string;
+  departureIndex: number;
   serviceName: string;
   category: string;
   x: number;
@@ -69,7 +70,7 @@ export type Selection =
   | { type: "station"; id: string }
   | { type: "line"; id: string }
   | { type: "service"; id: string }
-  | { type: "train"; id: string; serviceId: string }
+  | { type: "train"; id: string; serviceId: string; departureIndex: number }
   | null;
 
 export type ToolMode = "select" | "station" | "line";

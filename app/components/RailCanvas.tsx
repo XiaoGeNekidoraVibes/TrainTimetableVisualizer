@@ -280,7 +280,12 @@ export function RailCanvas({
         trainDistance = candidate;
       }
     }
-    if (closestTrain) return { type: "train", id: closestTrain.id, serviceId: closestTrain.serviceId };
+    if (closestTrain) return {
+      type: "train",
+      id: closestTrain.id,
+      serviceId: closestTrain.serviceId,
+      departureIndex: closestTrain.departureIndex,
+    };
 
     let closestStation: Station | undefined;
     let stationDistance = 13 / camera.scale;

@@ -85,6 +85,9 @@ export function StationDisplay({
   };
 
   return (
+    <div className="station-display-layer" onMouseDown={(event) => {
+      if (event.target === event.currentTarget) onClose();
+    }}>
     <div className="station-display" role="dialog" aria-modal="true" aria-label={`${station?.name ?? "车站"}看板`}>
       <header className="station-display-header">
         <div className="station-display-brand">
@@ -224,6 +227,7 @@ export function StationDisplay({
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

@@ -179,6 +179,7 @@ export function collectActiveTrains(
         key: `${service.id}:${departureIndex}`,
         id,
         serviceId: service.id,
+        departureIndex,
         serviceName: service.name,
         category: service.category || "普通",
         x: position.point.x,

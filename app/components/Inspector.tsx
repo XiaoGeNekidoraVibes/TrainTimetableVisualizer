@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type {
   CompiledRoute,
   RailLine,
@@ -23,6 +24,42 @@ type InspectorProps = {
   onDeleteService: (id: string) => void;
   onOpenStationDisplay: (stationId: string, view: "board" | "timetable") => void;
 };
+
+function LineEndEditor({
+  line,
+  stations,
+  onChange,
+}: {
+  line: RailLine;
+  stations: Station[];
+  onChange: (line: RailLine) => void;
+}) {
+  const [stationId, setStationId] = useState("");
+  const add = (side: "start" | "end") => {
+    if (!stationId) return;
+    onChange({
+      ...line,
+      stationIds: side === "start"
+        ? [stationId, ...line.stationIds]
+        : [...line.stationIds, stationId],
+    });
+    setStationId("");
+  };
+  return (
+    <div className="line-end-editor">
+      <select value={stationId} onChange={(event) => setStationId(event.target.value)}>
+        <option value="">选择待追加站点…</option>
+        {stations.filter((station) => !line.stationIds.includes(station.id)).map((station) => (
+          <option key={station.id} value={station.id}>{station.name}</option>
+        ))}
+      </select>
+      <div>
+        <button type="button" disabled={!stationId} onClick={() => add("start")}><span>←</span> 加到起点</button>
+        <button type="button" disabled={!stationId} onClick={() => add("end")}>加到终点 <span>→</span></button>
+      </div>
+    </div>
+  );
+}
 
 export function Inspector({
   selection,
@@ -145,17 +182,7 @@ export function Inspector({
               </div>
             ))}
           </div>
-          <label className="inline-add-field">
-            <select defaultValue="">
-              <option value="" disabled>选择站点…</option>
-              {stations.filter((station) => !line.stationIds.includes(station.id)).map((station) => <option key={station.id} value={station.id}>{station.name}</option>)}
-            </select>
-            <button type="button" onClick={(event) => {
-              const select = event.currentTarget.previousElementSibling as HTMLSelectElement;
-              if (select.value) onLineChange({ ...line, stationIds: [...line.stationIds, select.value] });
-              select.value = "";
-            }}>添加</button>
-          </label>
+          <LineEndEditor line={line} stations={stations} onChange={onLineChange} />
           <p className="field-note">增删站点后，Service 路径会按稳定站点 ID 自动重新展开。</p>
         </section>
         <button className="delete-button" type="button" onClick={() => onDeleteLine(line.id)}>删除此线路</button>
