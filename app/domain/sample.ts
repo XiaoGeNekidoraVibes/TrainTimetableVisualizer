@@ -3,6 +3,7 @@ import type { NetworkSnapshot, Service } from "./types";
 const rapid: Service = {
   id: "service-r1",
   name: "晨光快线",
+  category: "高速",
   idFormula: "G{100+n*2}",
   departures: [21600, 23400, 25200, 27000, 28800, 30600],
   color: "#ffb36b",
@@ -22,6 +23,7 @@ const rapid: Service = {
 const local: Service = {
   id: "service-l2",
   name: "环城通勤",
+  category: "普通",
   idFormula: "C{20+n}",
   departures: [22200, 23100, 24000, 24900, 25800, 26700, 27600, 28500],
   color: "#83d8c5",

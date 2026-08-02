@@ -15,6 +15,7 @@ import type {
 import { formatTime, parseClock } from "../lib/time";
 import { Inspector } from "./Inspector";
 import { RailCanvas } from "./RailCanvas";
+import { StationDisplay } from "./StationDisplay";
 
 const LINE_COLORS = ["#e8834d", "#42a99a", "#d8b557", "#7c92df", "#c96b86"];
 const makeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -77,6 +78,10 @@ export function TrainVisualizer() {
   const [draftStationIds, setDraftStationIds] = useState<string[]>([]);
   const [activeCount, setActiveCount] = useState(0);
   const [notice, setNotice] = useState("示例网络已就绪");
+  const [stationDisplay, setStationDisplay] = useState<{
+    stationId: string;
+    view: "board" | "timetable";
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const clock = useSimulationClock(6 * 3600 + 42 * 60);
   const { playing: clockPlaying, setPlaying: setClockPlaying } = clock;
@@ -137,6 +142,7 @@ export function TrainVisualizer() {
     const service: Service = {
       id,
       name: `新 Service ${network.services.length + 1}`,
+      category: "普通",
       idFormula: "T{100+n}",
       departures: [21600],
       color: LINE_COLORS[(network.services.length + 2) % LINE_COLORS.length],
@@ -168,7 +174,15 @@ export function TrainVisualizer() {
       if (!Array.isArray(data.stations) || !Array.isArray(data.lines) || !Array.isArray(data.services)) {
         throw new Error("invalid project");
       }
-      setNetwork({ stations: data.stations, lines: data.lines, services: data.services });
+      setNetwork({
+        stations: data.stations,
+        lines: data.lines,
+        services: data.services.map((service, index) => ({
+          ...service,
+          category: service.category || "普通",
+          color: service.color || LINE_COLORS[index % LINE_COLORS.length],
+        })),
+      });
       setSelection(null);
       setNotice("项目已导入");
     } catch {
@@ -355,8 +369,22 @@ export function TrainVisualizer() {
             setSelection(null);
             setNotice("Service 已删除");
           }}
+          onOpenStationDisplay={(stationId, view) => setStationDisplay({ stationId, view })}
         />
       </aside>
+      {stationDisplay && (
+        <StationDisplay
+          key={`${stationDisplay.stationId}:${stationDisplay.view}`}
+          initialStationId={stationDisplay.stationId}
+          initialView={stationDisplay.view}
+          stations={network.stations}
+          lines={network.lines}
+          services={network.services}
+          routes={compiledRoutes}
+          clockSeconds={((clock.displaySeconds % 86400) + 86400) % 86400}
+          onClose={() => setStationDisplay(null)}
+        />
+      )}
     </main>
   );
 }

@@ -10,7 +10,14 @@ import type {
   TimingRule,
 } from "../domain/types";
 import { validateSchedule } from "../domain/simulation";
-import { formatTime, parseDepartureList } from "../lib/time";
+import {
+  createDepartureRange,
+  formatDuration,
+  formatTime,
+  parseClock,
+  parseDepartureList,
+  parseDuration,
+} from "../lib/time";
 
 type ServiceEditorProps = {
   service: Service;
@@ -23,16 +30,27 @@ type ServiceEditorProps = {
 
 const makeId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
-function secondsInput(value: number, onChange: (value: number) => void, label: string) {
+function durationInput(value: number, onChange: (value: number) => void, label: string) {
   return (
     <input
+      key={`${label}:${value}`}
       className="time-offset"
-      type="number"
-      min={0}
-      step={1}
+      type="text"
+      inputMode="numeric"
       aria-label={label}
-      value={value}
-      onChange={(event) => onChange(Math.max(0, Number(event.target.value) || 0))}
+      defaultValue={formatDuration(value)}
+      placeholder="00:00:00"
+      onBlur={(event) => {
+        const parsed = parseDuration(event.target.value);
+        if (parsed === null) event.target.value = formatDuration(value);
+        else {
+          event.target.value = formatDuration(parsed);
+          onChange(parsed);
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
     />
   );
 }
@@ -48,6 +66,10 @@ export function ServiceEditor({
   const [departureText, setDepartureText] = useState(
     service.departures.map((time) => formatTime(time)).join(", "),
   );
+  const [rangeStart, setRangeStart] = useState("06:00:00");
+  const [rangeEnd, setRangeEnd] = useState("23:00:00");
+  const [rangeInterval, setRangeInterval] = useState("00:30:00");
+  const [rangeError, setRangeError] = useState<string | null>(null);
 
   const stationMap = new Map(stations.map((station) => [station.id, station]));
   const error = validateSchedule(service, route);
@@ -91,6 +113,23 @@ export function ServiceEditor({
     onChange({ ...service, timings: { ...service.timings, [key]: timing } });
   };
 
+  const addDepartureRange = () => {
+    const start = parseClock(rangeStart);
+    const end = parseClock(rangeEnd);
+    const interval = parseDuration(rangeInterval);
+    if (start === null || end === null || interval === null || interval <= 0 || end < start) {
+      setRangeError("请检查开始、结束和间隔时间；结束时间不能早于开始时间");
+      return;
+    }
+    const departures = Array.from(new Set([
+      ...service.departures,
+      ...createDepartureRange(start, end, interval),
+    ])).sort((a, b) => a - b);
+    onChange({ ...service, departures });
+    setDepartureText(departures.map((time) => formatTime(time)).join(", "));
+    setRangeError(null);
+  };
+
   return (
     <div className="inspector-scroll service-editor">
       <div className="inspector-heading">
@@ -106,6 +145,27 @@ export function ServiceEditor({
           <span>列车名称</span>
           <input value={service.name} onChange={(event) => onChange({ ...service, name: event.target.value })} />
         </label>
+        <div className="service-identity-grid">
+          <label>
+            <span>种别</span>
+            <input
+              value={service.category ?? "普通"}
+              list="service-category-options"
+              onChange={(event) => onChange({ ...service, category: event.target.value })}
+              placeholder="普通 / 快速 / 高速"
+            />
+            <datalist id="service-category-options">
+              <option value="普通" /><option value="快速" /><option value="高速" /><option value="特急" />
+            </datalist>
+          </label>
+          <label>
+            <span>Service 颜色</span>
+            <div className="color-field service-color-field">
+              <input type="color" value={service.color} onChange={(event) => onChange({ ...service, color: event.target.value })} />
+              <code>{service.color}</code>
+            </div>
+          </label>
+        </div>
         <label>
           <span>编号公式</span>
           <input
@@ -130,6 +190,26 @@ export function ServiceEditor({
           />
           <small>用逗号或空格分隔，精确到秒</small>
         </label>
+        <div className="departure-generator">
+          <div className="departure-generator-title">
+            <strong>按时间范围批量添加</strong>
+            <span>包含结束时刻</span>
+          </div>
+          <div className="departure-range-grid">
+            <label><span>开始</span><input type="time" step={1} value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label>
+            <label><span>结束</span><input type="time" step={1} value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} /></label>
+            <label><span>间隔</span><input type="text" inputMode="numeric" value={rangeInterval} onChange={(event) => setRangeInterval(event.target.value)} placeholder="00:30:00" /></label>
+          </div>
+          <div className="departure-generator-actions">
+            <button type="button" onClick={addDepartureRange}>＋ 添加班次</button>
+            <button type="button" className="secondary" onClick={() => {
+              onChange({ ...service, departures: [] });
+              setDepartureText("");
+              setRangeError(null);
+            }}>清空</button>
+          </div>
+          {rangeError && <p className="range-error">{rangeError}</p>}
+        </div>
       </section>
 
       <section className="form-section">
@@ -182,7 +262,7 @@ export function ServiceEditor({
               <span className="eyebrow">TIMING</span>
               <h3>停靠与通过</h3>
             </div>
-            <span className="unit-badge">单位：秒</span>
+            <span className="unit-badge">相对发车时间 · HH:MM:SS</span>
           </div>
           <div className="timing-table-head">
             <span>站点</span><span>模式</span><span>时间</span>
@@ -214,12 +294,12 @@ export function ServiceEditor({
                   <div className="timing-inputs">
                     {rule.mode === "stop" && (
                       <>
-                        {secondsInput(rule.arrival, (arrival) => setTiming(routeStation.occurrenceKey, { ...rule, arrival }), "到达秒数")}
+                        {durationInput(rule.arrival, (arrival) => setTiming(routeStation.occurrenceKey, { ...rule, arrival }), "相对到达时间")}
                         <span>/</span>
-                        {secondsInput(rule.departure, (departure) => setTiming(routeStation.occurrenceKey, { ...rule, departure }), "发车秒数")}
+                        {durationInput(rule.departure, (departure) => setTiming(routeStation.occurrenceKey, { ...rule, departure }), "相对发车时间")}
                       </>
                     )}
-                    {rule.mode === "pass-exact" && secondsInput(rule.pass, (pass) => setTiming(routeStation.occurrenceKey, { ...rule, pass }), "通过秒数")}
+                    {rule.mode === "pass-exact" && durationInput(rule.pass, (pass) => setTiming(routeStation.occurrenceKey, { ...rule, pass }), "相对通过时间")}
                     {rule.mode === "pass-flexible" && <span className="free-time">自动求解</span>}
                   </div>
                 </div>

@@ -28,6 +28,7 @@ export type TimingRule =
 export type Service = {
   id: string;
   name: string;
+  category: string;
   idFormula: string;
   departures: number[];
   routeLegs: RouteLeg[];
@@ -55,6 +56,7 @@ export type TrainRenderState = {
   id: string;
   serviceId: string;
   serviceName: string;
+  category: string;
   x: number;
   y: number;
   angle: number;

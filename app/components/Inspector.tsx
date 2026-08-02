@@ -21,6 +21,7 @@ type InspectorProps = {
   onDeleteStation: (id: string) => void;
   onDeleteLine: (id: string) => void;
   onDeleteService: (id: string) => void;
+  onOpenStationDisplay: (stationId: string, view: "board" | "timetable") => void;
 };
 
 export function Inspector({
@@ -35,6 +36,7 @@ export function Inspector({
   onDeleteStation,
   onDeleteLine,
   onDeleteService,
+  onOpenStationDisplay,
 }: InspectorProps) {
   if (!selection) {
     return (
@@ -82,6 +84,15 @@ export function Inspector({
           <div className="coordinate-grid">
             <label><span>X</span><input type="number" value={Math.round(station.position.x)} onChange={(event) => onStationChange({ ...station, position: { ...station.position, x: Number(event.target.value) } })} /></label>
             <label><span>Y</span><input type="number" value={Math.round(station.position.y)} onChange={(event) => onStationChange({ ...station, position: { ...station.position, y: Number(event.target.value) } })} /></label>
+          </div>
+        </section>
+        <section className="form-section station-display-launcher">
+          <span className="eyebrow">STATION DISPLAY</span>
+          <h3>车站信息显示</h3>
+          <p className="field-note">基于当前模拟时钟显示本站动态和全天发车时刻。</p>
+          <div>
+            <button type="button" onClick={() => onOpenStationDisplay(station.id, "board")}>打开车站大屏</button>
+            <button type="button" onClick={() => onOpenStationDisplay(station.id, "timetable")}>打开日式时刻表</button>
           </div>
         </section>
         <section className="form-section">

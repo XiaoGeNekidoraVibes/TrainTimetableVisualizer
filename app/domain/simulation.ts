@@ -180,6 +180,7 @@ export function collectActiveTrains(
         id,
         serviceId: service.id,
         serviceName: service.name,
+        category: service.category || "普通",
         x: position.point.x,
         y: position.point.y,
         angle: position.angle,
