@@ -20,6 +20,20 @@ import { TrainPid } from "./TrainPid";
 
 const LINE_COLORS = ["#e8834d", "#42a99a", "#d8b557", "#7c92df", "#c96b86"];
 const makeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+const PROJECT_STORAGE_KEY = "rail-flow:project:v2";
+
+function normalizeNetwork(data: Partial<NetworkSnapshot>): NetworkSnapshot | null {
+  if (!Array.isArray(data.stations) || !Array.isArray(data.lines) || !Array.isArray(data.services)) return null;
+  return {
+    stations: data.stations,
+    lines: data.lines,
+    services: data.services.map((service, index) => ({
+      ...service,
+      category: service.category || "普通",
+      color: service.color || LINE_COLORS[index % LINE_COLORS.length],
+    })),
+  };
+}
 
 type ClockRuntime = {
   baseSeconds: number;
@@ -78,7 +92,9 @@ export function TrainVisualizer() {
   const [tool, setTool] = useState<ToolMode>("select");
   const [draftStationIds, setDraftStationIds] = useState<string[]>([]);
   const [activeCount, setActiveCount] = useState(0);
-  const [notice, setNotice] = useState("示例网络已就绪");
+  const [notice, setNotice] = useState("示例网络已就绪；按 Ctrl+S 保存到本机");
+  const [showOsm, setShowOsm] = useState(true);
+  const [osmOpacity, setOsmOpacity] = useState(0.42);
   const [stationDisplay, setStationDisplay] = useState<{
     stationId: string;
     view: "board" | "timetable";
@@ -100,6 +116,47 @@ export function TrainVisualizer() {
     ? network.services.find((service) => service.id === selection.serviceId)
     : undefined;
 
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      try {
+        const stored = window.localStorage.getItem(PROJECT_STORAGE_KEY);
+        if (!stored) return;
+        const restored = normalizeNetwork(JSON.parse(stored) as Partial<NetworkSnapshot>);
+        if (!restored) throw new Error("invalid local project");
+        setNetwork(restored);
+        setNotice("已恢复上次保存的本地项目");
+      } catch {
+        setNotice("本地存档无法读取，已载入示例网络");
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  const saveProject = useCallback(() => {
+    try {
+      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 2, ...network }));
+      setNotice(`已保存到本机 · ${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`);
+    } catch {
+      setNotice("保存失败：浏览器未允许本地存储");
+    }
+  }, [network]);
+
+  const createNewProject = () => {
+    if (!window.confirm("新建项目会清空当前画布。未保存的更改将无法恢复，是否继续？")) return;
+    const empty: NetworkSnapshot = { stations: [], lines: [], services: [] };
+    setNetwork(empty);
+    setSelection(null);
+    setDraftStationIds([]);
+    setStationDisplay(null);
+    setTool("station");
+    try {
+      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 2, ...empty }));
+    } catch {
+      // The empty project still remains available for the current session.
+    }
+    setNotice("已新建空白项目；站点工具保持开启，可连续摆放");
+  };
+
   const selectTool = (next: ToolMode) => {
     setTool(next);
     if (next !== "line") setDraftStationIds([]);
@@ -111,8 +168,7 @@ export function TrainVisualizer() {
     const station: Station = { id, name: `新站 ${network.stations.length + 1}`, position };
     setNetwork((current) => ({ ...current, stations: [...current.stations, station] }));
     setSelection({ type: "station", id });
-    setTool("select");
-    setNotice("站点已创建，可在右侧重命名");
+    setNotice("站点已创建；继续点击可连续摆放，按 V 切回选择模式");
   };
 
   const finishLine = useCallback(() => {
@@ -174,21 +230,11 @@ export function TrainVisualizer() {
 
   const importProject = async (file: File) => {
     try {
-      const data = JSON.parse(await file.text()) as Partial<NetworkSnapshot>;
-      if (!Array.isArray(data.stations) || !Array.isArray(data.lines) || !Array.isArray(data.services)) {
-        throw new Error("invalid project");
-      }
-      setNetwork({
-        stations: data.stations,
-        lines: data.lines,
-        services: data.services.map((service, index) => ({
-          ...service,
-          category: service.category || "普通",
-          color: service.color || LINE_COLORS[index % LINE_COLORS.length],
-        })),
-      });
+      const data = normalizeNetwork(JSON.parse(await file.text()) as Partial<NetworkSnapshot>);
+      if (!data) throw new Error("invalid project");
+      setNetwork(data);
       setSelection(null);
-      setNotice("项目已导入");
+      setNotice("项目已导入；按 Ctrl+S 保存到本机");
     } catch {
       setNotice("无法导入：文件格式不正确");
     }
@@ -197,6 +243,11 @@ export function TrainVisualizer() {
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        saveProject();
+        return;
+      }
       if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
       if (event.key.toLowerCase() === "v") selectTool("select");
       if (event.key.toLowerCase() === "s") selectTool("station");
@@ -221,7 +272,7 @@ export function TrainVisualizer() {
       window.removeEventListener("keydown", handleKey);
       window.removeEventListener("open-service", openService);
     };
-  }, [clockPlaying, finishLine, setClockPlaying, tool]);
+  }, [clockPlaying, finishLine, saveProject, setClockPlaying, tool]);
 
   return (
     <main className="app-shell">
@@ -266,8 +317,10 @@ export function TrainVisualizer() {
         </div>
 
         <div className="top-actions">
-          <button type="button" onClick={() => fileInputRef.current?.click()}>导入</button>
-          <button type="button" onClick={exportProject}>导出</button>
+          <button type="button" onClick={createNewProject}>新建</button>
+          <button type="button" className="save-action" title="保存到本机 (Ctrl+S)" onClick={saveProject}>保存</button>
+          <button type="button" className="secondary-file-action" onClick={() => fileInputRef.current?.click()}>导入</button>
+          <button type="button" className="secondary-file-action" onClick={exportProject}>导出</button>
           <input ref={fileInputRef} hidden type="file" accept="application/json" onChange={(event) => {
             const file = event.target.files?.[0];
             if (file) void importProject(file);
@@ -313,7 +366,7 @@ export function TrainVisualizer() {
             ))}
           </div>
         </section>
-        <div className="library-footer"><span className="status-light" />本地项目 · 自动运行</div>
+        <div className="library-footer"><span className="status-light" />本地项目 · Ctrl+S 保存</div>
       </aside>
 
       <section className="canvas-stage">
@@ -325,6 +378,8 @@ export function TrainVisualizer() {
           tool={tool}
           selection={selection}
           draftStationIds={draftStationIds}
+          showOsm={showOsm}
+          osmOpacity={osmOpacity}
           getClockSeconds={clock.getSeconds}
           onSelect={setSelection}
           onAddStation={addStation}
@@ -335,6 +390,21 @@ export function TrainVisualizer() {
           onAppendDraftStation={(stationId) => setDraftStationIds((current) => current.at(-1) === stationId || current.includes(stationId) ? current : [...current, stationId])}
           onActiveCountChange={setActiveCount}
         />
+        <div className="map-controls" aria-label="地图底图设置">
+          <label className="map-toggle">
+            <input type="checkbox" checked={showOsm} onChange={(event) => setShowOsm(event.target.checked)} />
+            <span>OSM 底图</span>
+          </label>
+          {showOsm && (
+            <label className="map-opacity">
+              <span>透明度</span>
+              <input type="range" min={0.18} max={0.82} step={0.02} value={osmOpacity} onChange={(event) => setOsmOpacity(Number(event.target.value))} />
+            </label>
+          )}
+        </div>
+        {showOsm && (
+          <a className="osm-attribution" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap contributors</a>
+        )}
         {selection?.type === "train" && selectedTrainService && compiledRoutes.get(selectedTrainService.id)?.valid && (
           <TrainPid
             trainId={selection.id}

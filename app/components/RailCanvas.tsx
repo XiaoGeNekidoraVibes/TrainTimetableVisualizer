@@ -30,6 +30,8 @@ type RailCanvasProps = {
   tool: ToolMode;
   selection: Selection;
   draftStationIds: string[];
+  showOsm: boolean;
+  osmOpacity: number;
   getClockSeconds: () => number;
   onSelect: (selection: Selection) => void;
   onAddStation: (position: Point) => void;
@@ -49,6 +51,81 @@ type PointerState = {
 
 const WORLD_WIDTH = 1020;
 const WORLD_HEIGHT = 720;
+const OSM_TILE_SIZE = 256;
+const OSM_BASE_ZOOM = 13;
+const OSM_CENTER = { longitude: 121.4737, latitude: 31.2304 };
+const osmTileCache = new Map<string, HTMLImageElement | null>();
+
+function longitudeToPixel(longitude: number, zoom: number) {
+  return ((longitude + 180) / 360) * OSM_TILE_SIZE * 2 ** zoom;
+}
+
+function latitudeToPixel(latitude: number, zoom: number) {
+  const radians = (Math.max(-85.0511, Math.min(85.0511, latitude)) * Math.PI) / 180;
+  return (1 - Math.log(Math.tan(radians) + 1 / Math.cos(radians)) / Math.PI) / 2
+    * OSM_TILE_SIZE * 2 ** zoom;
+}
+
+const osmBaseOrigin = {
+  x: longitudeToPixel(OSM_CENTER.longitude, OSM_BASE_ZOOM) - WORLD_WIDTH / 2,
+  y: latitudeToPixel(OSM_CENTER.latitude, OSM_BASE_ZOOM) - WORLD_HEIGHT / 2,
+};
+
+function getOsmTile(zoom: number, x: number, y: number) {
+  const tilesPerAxis = 2 ** zoom;
+  if (y < 0 || y >= tilesPerAxis) return null;
+  const wrappedX = ((x % tilesPerAxis) + tilesPerAxis) % tilesPerAxis;
+  const key = `${zoom}/${wrappedX}/${y}`;
+  if (osmTileCache.has(key)) return osmTileCache.get(key) ?? null;
+  if (osmTileCache.size >= 320) osmTileCache.delete(osmTileCache.keys().next().value!);
+  const tile = new Image();
+  tile.crossOrigin = "anonymous";
+  tile.decoding = "async";
+  tile.src = `https://tile.openstreetmap.org/${zoom}/${wrappedX}/${y}.png`;
+  tile.onerror = () => osmTileCache.set(key, null);
+  osmTileCache.set(key, tile);
+  return tile;
+}
+
+function drawOsmBaseMap(
+  ctx: CanvasRenderingContext2D,
+  width: number,
+  height: number,
+  camera: Camera,
+  opacity: number,
+) {
+  const zoom = Math.max(2, Math.min(19, Math.round(OSM_BASE_ZOOM + Math.log2(camera.scale))));
+  const zoomFactor = 2 ** (zoom - OSM_BASE_ZOOM);
+  const left = -camera.x / camera.scale;
+  const top = -camera.y / camera.scale;
+  const right = (width - camera.x) / camera.scale;
+  const bottom = (height - camera.y) / camera.scale;
+  const startX = Math.floor(((osmBaseOrigin.x + left) * zoomFactor) / OSM_TILE_SIZE);
+  const endX = Math.floor(((osmBaseOrigin.x + right) * zoomFactor) / OSM_TILE_SIZE);
+  const startY = Math.floor(((osmBaseOrigin.y + top) * zoomFactor) / OSM_TILE_SIZE);
+  const endY = Math.floor(((osmBaseOrigin.y + bottom) * zoomFactor) / OSM_TILE_SIZE);
+  const worldTileSize = OSM_TILE_SIZE / zoomFactor;
+
+  ctx.save();
+  ctx.globalAlpha = opacity;
+  for (let tileY = startY; tileY <= endY; tileY += 1) {
+    for (let tileX = startX; tileX <= endX; tileX += 1) {
+      const tile = getOsmTile(zoom, tileX, tileY);
+      if (!tile?.complete || !tile.naturalWidth) continue;
+      ctx.drawImage(
+        tile,
+        (tileX * OSM_TILE_SIZE) / zoomFactor - osmBaseOrigin.x,
+        (tileY * OSM_TILE_SIZE) / zoomFactor - osmBaseOrigin.y,
+        worldTileSize + 0.5,
+        worldTileSize + 0.5,
+      );
+    }
+  }
+  ctx.globalAlpha = Math.min(0.34, opacity * 0.62);
+  ctx.fillStyle = "#0d110e";
+  ctx.fillRect(left, top, right - left, bottom - top);
+  ctx.restore();
+}
 
 function screenToWorld(point: Point, camera: Camera): Point {
   return { x: (point.x - camera.x) / camera.scale, y: (point.y - camera.y) / camera.scale };
@@ -96,6 +173,8 @@ export function RailCanvas({
   tool,
   selection,
   draftStationIds,
+  showOsm,
+  osmOpacity,
   getClockSeconds,
   onSelect,
   onAddStation,
@@ -161,6 +240,8 @@ export function RailCanvas({
       context.save();
       context.translate(camera.x, camera.y);
       context.scale(camera.scale, camera.scale);
+
+      if (showOsm) drawOsmBaseMap(context, width, height, camera, osmOpacity);
 
       for (const line of lines) {
         const sampled = sampledLines.get(line.id);
@@ -261,9 +342,11 @@ export function RailCanvas({
     getClockSeconds,
     lines,
     onActiveCountChange,
+    osmOpacity,
     sampledLines,
     selection,
     services,
+    showOsm,
     stationMap,
     stations,
   ]);

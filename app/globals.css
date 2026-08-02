@@ -40,7 +40,7 @@ button { color: inherit; }
   grid-column: 1 / -1;
   grid-row: 1;
   display: grid;
-  grid-template-columns: 304px minmax(420px, 1fr) 304px;
+  grid-template-columns: 304px minmax(420px, 1fr) 400px;
   align-items: center;
   border-bottom: 1px solid var(--line);
   background: #171a18;
@@ -67,6 +67,7 @@ button { color: inherit; }
 .top-actions { height: 100%; padding: 0 18px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; border-left: 1px solid var(--line); }
 .top-actions > button { border: 1px solid var(--line); background: transparent; border-radius: 5px; padding: 8px 10px; font-size: 11px; color: var(--muted); cursor: pointer; }
 .top-actions > button:hover { color: var(--text); border-color: var(--line-strong); }
+.top-actions > button.save-action { color: #1a201c; border-color: var(--teal); background: var(--teal); font-weight: 700; }
 .running-badge { display: flex; align-items: center; gap: 7px; white-space: nowrap; margin-left: 4px; padding: 8px 9px; border: 1px solid rgba(99, 197, 179, .2); color: #b7dbd3; background: rgba(99, 197, 179, .06); border-radius: 5px; font-size: 11px; }
 .running-badge span { width: 6px; height: 6px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 9px var(--teal); }
 
@@ -112,6 +113,13 @@ button { color: inherit; }
 .rail-canvas.tool-line { cursor: cell; }
 .canvas-status { position: absolute; left: 14px; right: 14px; bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 18px; pointer-events: none; color: #818b83; font-size: 10px; }
 .canvas-status > span { max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.map-controls { position: absolute; z-index: 8; top: 14px; left: 14px; display: flex; align-items: center; gap: 9px; padding: 7px 9px; border: 1px solid rgba(232,239,232,.16); border-radius: 6px; color: #b5beb7; background: rgba(20,24,21,.82); box-shadow: 0 8px 24px rgba(0,0,0,.22); backdrop-filter: blur(12px); }
+.map-toggle, .map-opacity { display: flex; align-items: center; gap: 7px; white-space: nowrap; font-size: 9px; }
+.map-toggle input { accent-color: var(--teal); }
+.map-opacity { padding-left: 9px; border-left: 1px solid var(--line); color: #7f8981; }
+.map-opacity input { width: 76px; accent-color: var(--teal); }
+.osm-attribution { position: absolute; z-index: 8; right: 14px; bottom: 34px; padding: 3px 6px; border-radius: 3px; color: #87928a; background: rgba(18,22,19,.78); font-size: 8px; text-decoration: none; backdrop-filter: blur(8px); }
+.osm-attribution:hover { color: #d4dbd5; }
 kbd { display: inline-block; min-width: 19px; padding: 2px 5px; border: 1px solid var(--line-strong); border-bottom-color: rgba(255,255,255,.26); border-radius: 3px; text-align: center; color: #aeb6af; background: rgba(255,255,255,.035); font-family: var(--font-geist-mono), monospace; font-size: 8px; }
 .draft-actions { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 11px; padding: 8px 9px 8px 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: rgba(27,31,28,.94); box-shadow: 0 12px 35px rgba(0,0,0,.26); }
 .draft-actions strong { font-size: 11px; }
@@ -375,7 +383,7 @@ kbd { display: inline-block; min-width: 19px; padding: 2px 5px; border: 1px soli
 @media (max-width: 1180px) {
   .app-shell { grid-template-columns: 58px 210px minmax(430px,1fr) 318px; }
   .topbar { grid-template-columns: 268px minmax(390px,1fr) 275px; }
-  .top-actions > button { display: none; }
+  .top-actions > button.secondary-file-action { display: none; }
   .day-slider { width: 160px; }
 }
 
@@ -396,6 +404,8 @@ kbd { display: inline-block; min-width: 19px; padding: 2px 5px; border: 1px soli
   .board-title-row, .timetable-title-row { align-items: flex-start; flex-direction: column; }
   .field-toggles { justify-content: flex-start; }
   .field-toggles > span { text-align: left; }
+  .top-actions > button { display: none; }
+  .map-controls { top: 10px; left: 10px; }
   .train-pid { z-index: 21; left: 12px; width: calc(100% - 24px); transform: none; }
   .pid-header { grid-template-columns: 160px minmax(0,1fr) 34px; }
 }
