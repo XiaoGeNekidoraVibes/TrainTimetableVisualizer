@@ -49,6 +49,8 @@ export function StationDisplay({
   const [showPassing, setShowPassing] = useState(false);
   const [precision, setPrecision] = useState<"minute" | "second">("minute");
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [destinationMarks, setDestinationMarks] = useState<Record<string, string>>({});
   const [fields, setFields] = useState<Record<FieldKey, boolean>>({
     category: true,
     trainId: true,
@@ -74,14 +76,30 @@ export function StationDisplay({
   const filteredBoardEvents = boardEvents.filter((event) =>
     (showPassing || event.status !== "passing") && filterByLines(event.lineIds, selectedLineIds),
   );
+  const timetableServices = Array.from(
+    new Map(timetable.map((event) => [event.serviceId, event])).values(),
+  );
   const filteredTimetable = timetable.filter((event) =>
-    (showPassing || !event.passing) && filterByLines(event.lineIds, selectedLineIds),
+    (showPassing || !event.passing)
+    && filterByLines(event.lineIds, selectedLineIds)
+    && (!selectedServiceIds.length || selectedServiceIds.includes(event.serviceId)),
+  );
+  const timetableDestinations = Array.from(new Set(filteredTimetable.map((event) => event.destination)));
+  const showDestinationMarks = timetableDestinations.length > 1;
+  const destinationMark = (destination: string) => (
+    destinationMarks[destination] ?? Array.from(destination.trim())[0] ?? "?"
   );
 
   const toggleLine = (lineId: string) => {
     setSelectedLineIds((current) => current.includes(lineId)
       ? current.filter((id) => id !== lineId)
       : [...current, lineId]);
+  };
+
+  const toggleService = (serviceId: string) => {
+    setSelectedServiceIds((current) => current.includes(serviceId)
+      ? current.filter((id) => id !== serviceId)
+      : [...current, serviceId]);
   };
 
   return (
@@ -110,6 +128,7 @@ export function StationDisplay({
           <select value={station?.id} onChange={(event) => {
             setStationId(event.target.value);
             setSelectedLineIds([]);
+            setSelectedServiceIds([]);
           }}>
             {stations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
@@ -186,11 +205,23 @@ export function StationDisplay({
               <button className={precision === "second" ? "active" : ""} onClick={() => setPrecision("second")}>精确到秒</button>
             </div>
           </div>
-          <div className="timetable-legend">
-            {Array.from(new Map(filteredTimetable.map((item) => [item.serviceId, item])).values()).map((item) => (
-              <span key={item.serviceId}><i style={{ background: item.color }} />{item.category} · {item.serviceName}</span>
+          <div className="timetable-service-filter" aria-label="选择时刻表 Service">
+            <span>显示 Service</span>
+            <button
+              type="button"
+              className={!selectedServiceIds.length ? "active" : ""}
+              onClick={() => setSelectedServiceIds([])}
+            >全部</button>
+            {timetableServices.map((item) => (
+              <button
+                type="button"
+                key={item.serviceId}
+                className={selectedServiceIds.includes(item.serviceId) ? "active" : ""}
+                style={{ "--filter-color": item.color } as CSSProperties}
+                onClick={() => toggleService(item.serviceId)}
+              ><i />{item.category} · {item.serviceName}</button>
             ))}
-            {showPassing && <span><i className="pass-legend" />下划线表示通过</span>}
+            {showPassing && <span className="passing-legend"><i />下划线表示通过</span>}
           </div>
           <div className="timetable-columns">
             {[Array.from({ length: 12 }, (_, index) => index), Array.from({ length: 12 }, (_, index) => index + 12)].map((hours, columnIndex) => (
@@ -208,12 +239,15 @@ export function StationDisplay({
                           return (
                             <span
                               key={departure.key}
-                              className={`timetable-minute ${departure.passing ? "is-passing" : ""}`}
+                              className={`timetable-departure ${showDestinationMarks ? "has-destination-mark" : ""}`}
                               style={{ color: departure.color }}
                               title={`${departure.category} ${departure.trainId} → ${departure.destination} · ${formatTime(departure.time)}`}
                             >
-                              {String(minute).padStart(2, "0")}
-                              {precision === "second" && <sup>{String(second).padStart(2, "0")}</sup>}
+                              {showDestinationMarks && <small className="destination-mark">{destinationMark(departure.destination)}</small>}
+                              <span className={`timetable-minute ${departure.passing ? "is-passing" : ""}`}>
+                                {String(minute).padStart(2, "0")}
+                                {precision === "second" && <sup>{String(second).padStart(2, "0")}</sup>}
+                              </span>
                             </span>
                           );
                         })}
@@ -225,6 +259,25 @@ export function StationDisplay({
               </div>
             ))}
           </div>
+          {showDestinationMarks && (
+            <div className="destination-legend">
+              <div><strong>目的地图例</strong><small>可直接编辑标记</small></div>
+              {timetableDestinations.map((destination) => (
+                <label key={destination}>
+                  <input
+                    aria-label={`${destination}的目的地标记`}
+                    maxLength={4}
+                    value={destinationMark(destination)}
+                    onChange={(event) => setDestinationMarks((current) => ({
+                      ...current,
+                      [destination]: event.target.value,
+                    }))}
+                  />
+                  <span>{destination}</span>
+                </label>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
