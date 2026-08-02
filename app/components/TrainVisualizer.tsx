@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compileRoute } from "../domain/geometry";
 import { initialNetwork } from "../domain/sample";
+import { buildAnchors } from "../domain/simulation";
 import type {
   NetworkSnapshot,
   Point,
@@ -226,6 +227,59 @@ export function TrainVisualizer() {
     setNetwork((current) => ({ ...current, services: [...current.services, service] }));
     setSelection({ type: "service", id });
     setNotice("Service 已创建，请完善路径和时间约束");
+  };
+
+  const duplicateService = (serviceId: string, reverse: boolean) => {
+    const source = network.services.find((service) => service.id === serviceId);
+    if (!source) return;
+    const id = makeId("service");
+    const routeLegs = reverse
+      ? [...source.routeLegs].reverse().map((leg) => ({
+        ...leg,
+        id: makeId("leg"),
+        fromStationId: leg.toStationId,
+        toStationId: leg.fromStationId,
+      }))
+      : source.routeLegs.map((leg) => ({ ...leg, id: makeId("leg") }));
+    let timings: Service["timings"] = Object.fromEntries(
+      Object.entries(source.timings).map(([key, rule]) => [key, { ...rule }]),
+    );
+
+    if (reverse) {
+      const sourceRoute = compiledRoutes.get(source.id);
+      const reversedRoute = compileRoute(routeLegs, network.stations, network.lines);
+      const duration = sourceRoute ? buildAnchors(source, sourceRoute).at(-1)?.time ?? 0 : 0;
+      timings = {};
+      if (sourceRoute?.valid && reversedRoute.valid && sourceRoute.stations.length === reversedRoute.stations.length) {
+        reversedRoute.stations.forEach((station, index) => {
+          const sourceStation = sourceRoute.stations[sourceRoute.stations.length - 1 - index];
+          const rule = source.timings[sourceStation.occurrenceKey];
+          if (!rule || rule.mode === "pass-flexible") {
+            timings[station.occurrenceKey] = { mode: "pass-flexible" };
+          } else if (rule.mode === "pass-exact") {
+            timings[station.occurrenceKey] = { mode: "pass-exact", pass: duration - rule.pass };
+          } else {
+            timings[station.occurrenceKey] = {
+              mode: "stop",
+              arrival: duration - rule.departure,
+              departure: duration - rule.arrival,
+            };
+          }
+        });
+      }
+    }
+
+    const duplicate: Service = {
+      ...source,
+      id,
+      name: `${source.name} · ${reverse ? "反向" : "副本"}`,
+      departures: [...source.departures],
+      routeLegs,
+      timings,
+    };
+    setNetwork((current) => ({ ...current, services: [...current.services, duplicate] }));
+    setSelection({ type: "service", id });
+    setNotice(reverse ? "已复制并反转 Service，路径与相对时刻均已镜像" : "已复制 Service");
   };
 
   const exportProject = () => {
@@ -466,6 +520,7 @@ export function TrainVisualizer() {
             setSelection(null);
             setNotice("Service 已删除");
           }}
+          onDuplicateService={duplicateService}
           onOpenStationDisplay={(stationId, view) => setStationDisplay({ stationId, view })}
         />
       </aside>

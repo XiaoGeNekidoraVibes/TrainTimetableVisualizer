@@ -27,6 +27,7 @@ type ServiceEditorProps = {
   route: CompiledRoute;
   onChange: (service: Service) => void;
   onDelete: () => void;
+  onDuplicate: (reverse: boolean) => void;
 };
 
 const makeId = () => `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -63,6 +64,7 @@ export function ServiceEditor({
   route,
   onChange,
   onDelete,
+  onDuplicate,
 }: ServiceEditorProps) {
   const [departureText, setDepartureText] = useState(
     service.departures.map((time) => formatTime(time)).join(", "),
@@ -158,6 +160,11 @@ export function ServiceEditor({
           <h2>{service.name}</h2>
         </div>
         <span className={`validation-dot ${error ? "is-error" : "is-valid"}`} title={error ?? "时刻有效"} />
+      </div>
+
+      <div className="service-copy-actions">
+        <button type="button" onClick={() => onDuplicate(false)}>⧉ 复制 Service</button>
+        <button type="button" onClick={() => onDuplicate(true)}>⇄ 复制并反转</button>
       </div>
 
       <section className="form-section">

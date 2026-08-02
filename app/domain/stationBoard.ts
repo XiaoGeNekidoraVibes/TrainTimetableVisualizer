@@ -81,9 +81,17 @@ function routeLabels(route: CompiledRoute, stationMap: Map<string, Station>) {
   };
 }
 
-function stoppingStationNames(service: Service, route: CompiledRoute, stationMap: Map<string, Station>) {
+function stoppingStationNames(
+  service: Service,
+  route: CompiledRoute,
+  stationMap: Map<string, Station>,
+  relativeTime: number,
+) {
   return route.stations
-    .filter((station) => service.timings[station.occurrenceKey]?.mode === "stop")
+    .filter((station) => {
+      const rule = service.timings[station.occurrenceKey];
+      return rule?.mode === "stop" && rule.departure >= relativeTime;
+    })
     .map((station) => stationMap.get(station.stationId)?.name ?? "已删除站点");
 }
 
@@ -104,7 +112,6 @@ export function getStationBoardEvents(
     const routeStations = route.stations.filter((station) => station.stationId === stationId);
     if (!routeStations.length) continue;
     const labels = routeLabels(route, stationMap);
-    const stops = stoppingStationNames(service, route, stationMap);
     const lineIds = stationLineIds(service, stationId, lines);
     for (const routeStation of routeStations) {
       const timing = timingAtStation(service, route, routeStation.occurrenceKey, routeStation.distance);
@@ -131,7 +138,7 @@ export function getStationBoardEvents(
               referenceTime,
               countdown: Math.max(0, referenceTime - clockSeconds),
               status: dwelling ? "dwelling" : "arriving",
-              stoppingStations: stops,
+              stoppingStations: stoppingStationNames(service, route, stationMap, clockSeconds - base),
               lineIds,
             });
           } else {
@@ -149,7 +156,7 @@ export function getStationBoardEvents(
               referenceTime: passTime,
               countdown: Math.max(0, passTime - clockSeconds),
               status: "passing",
-              stoppingStations: stops,
+              stoppingStations: stoppingStationNames(service, route, stationMap, clockSeconds - base),
               lineIds,
             });
           }

@@ -224,6 +224,8 @@ export function RailCanvas({
   const pointerRef = useRef<PointerState | null>(null);
   const trainsRef = useRef<TrainRenderState[]>([]);
   const activeCountRef = useRef(-1);
+  const focusAnimationRef = useRef(0);
+  const lastFocusedLineRef = useRef<string | null>(null);
   const stationMap = useMemo(
     () => new Map(stations.map((station) => [station.id, station])),
     [stations],
@@ -232,6 +234,57 @@ export function RailCanvas({
     () => new Map(lines.map((line) => [line.id, sampleLine(line, stationMap)])),
     [lines, stationMap],
   );
+
+  useEffect(() => {
+    if (selection?.type !== "line") {
+      lastFocusedLineRef.current = null;
+      return;
+    }
+    if (lastFocusedLineRef.current === selection.id) return;
+    const canvas = canvasRef.current;
+    const points = sampledLines.get(selection.id)?.points ?? [];
+    if (!canvas || points.length < 2) return;
+    lastFocusedLineRef.current = selection.id;
+    cancelAnimationFrame(focusAnimationRef.current);
+    const bounds = canvas.getBoundingClientRect();
+    let minX = points[0].x;
+    let maxX = points[0].x;
+    let minY = points[0].y;
+    let maxY = points[0].y;
+    for (let index = 1; index < points.length; index += 1) {
+      minX = Math.min(minX, points[index].x);
+      maxX = Math.max(maxX, points[index].x);
+      minY = Math.min(minY, points[index].y);
+      maxY = Math.max(maxY, points[index].y);
+    }
+    const padding = 90;
+    const targetScale = Math.max(MIN_CAMERA_SCALE, Math.min(
+      MAX_CAMERA_SCALE,
+      Math.min(
+        Math.max(1, bounds.width - padding * 2) / Math.max(1, maxX - minX),
+        Math.max(1, bounds.height - padding * 2) / Math.max(1, maxY - minY),
+      ),
+    ));
+    const target = {
+      scale: targetScale,
+      x: bounds.width / 2 - ((minX + maxX) / 2) * targetScale,
+      y: bounds.height / 2 - ((minY + maxY) / 2) * targetScale,
+    };
+    const start = { ...cameraRef.current };
+    const startedAt = performance.now();
+    const animate = (now: number) => {
+      const progress = Math.min(1, (now - startedAt) / 360);
+      const eased = 1 - (1 - progress) ** 3;
+      cameraRef.current = {
+        scale: start.scale + (target.scale - start.scale) * eased,
+        x: start.x + (target.x - start.x) * eased,
+        y: start.y + (target.y - start.y) * eased,
+      };
+      if (progress < 1) focusAnimationRef.current = requestAnimationFrame(animate);
+    };
+    focusAnimationRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(focusAnimationRef.current);
+  }, [sampledLines, selection]);
   const renderSnapshotRef = useRef<RenderSnapshot>({
     stations,
     lines,

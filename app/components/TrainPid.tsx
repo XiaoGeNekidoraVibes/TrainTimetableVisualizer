@@ -56,6 +56,10 @@ export function TrainPid({
     const transfers = focusStation
       ? lines.filter((line) => line.stationIds.includes(focusStation.stationId) && !usedLineIds.has(line.id))
       : [];
+    const visibleStations = route.stations
+      .map((station, index) => ({ station, index }))
+      .filter(({ index }) => resolved[index].departure >= relativeTime);
+    const focusVisibleIndex = Math.max(0, visibleStations.findIndex(({ index }) => index === focusIndex));
 
     return {
       relativeTime,
@@ -67,6 +71,8 @@ export function TrainPid({
       destination: stationMap.get(route.stations.at(-1)?.stationId ?? "")?.name ?? "未知终点",
       transfers,
       stationMap,
+      visibleStations,
+      focusVisibleIndex,
     };
   }, [clockSeconds, departureIndex, lines, route, service, stations]);
 
@@ -116,20 +122,22 @@ export function TrainPid({
             </div>
             <div className="pid-eta"><strong>{etaMinutes}</strong><span>分钟后到达</span></div>
           </div>
-          <div className="pid-route-window">
-            <div className={`pid-route-track ${route.stations.length > 7 ? "is-long" : ""}`}>
-              {route.stations.map((station, index) => {
+          <div className="pid-route-window" key={model.focusIndex}>
+            <div
+              className={`pid-route-track ${model.visibleStations.length > 6 ? "is-long" : ""}`}
+              style={{ "--pid-focus-offset": `${model.focusVisibleIndex * 96 + 48}px` } as CSSProperties}
+            >
+              {model.visibleStations.map(({ station, index }) => {
                 const rule = service.timings[station.occurrenceKey];
                 const isPass = rule?.mode === "pass-exact" || rule?.mode === "pass-flexible";
-                const passed = model.resolved[index].departure < model.relativeTime;
                 const upcomingMinutes = Math.max(0, Math.ceil((model.resolved[index].arrival - model.relativeTime) / 60));
                 return (
                   <div
-                    className={`pid-route-stop ${passed ? "is-passed" : ""} ${isPass ? "is-pass" : ""} ${index === model.focusIndex ? "is-next" : ""}`}
+                    className={`pid-route-stop ${isPass ? "is-pass" : ""} ${index === model.focusIndex ? "is-next" : ""}`}
                     key={station.occurrenceKey}
                   >
                     <strong>{model.stationMap.get(station.stationId)?.name ?? "已删除"}</strong>
-                    <span className="pid-route-node">{passed ? "✓" : !isPass && index >= model.focusIndex ? upcomingMinutes : ""}</span>
+                    <span className="pid-route-node">{!isPass && index >= model.focusIndex ? upcomingMinutes : ""}</span>
                     <small>{isPass ? "通过" : index === model.focusIndex ? "下一站" : "停靠"}</small>
                   </div>
                 );

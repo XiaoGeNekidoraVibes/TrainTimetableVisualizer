@@ -22,6 +22,7 @@ type InspectorProps = {
   onDeleteStation: (id: string) => void;
   onDeleteLine: (id: string) => void;
   onDeleteService: (id: string) => void;
+  onDuplicateService: (id: string, reverse: boolean) => void;
   onOpenStationDisplay: (stationId: string, view: "board" | "timetable") => void;
 };
 
@@ -73,6 +74,7 @@ export function Inspector({
   onDeleteStation,
   onDeleteLine,
   onDeleteService,
+  onDuplicateService,
   onOpenStationDisplay,
 }: InspectorProps) {
   if (!selection) {
@@ -102,6 +104,7 @@ export function Inspector({
         route={routes.get(service.id)!}
         onChange={onServiceChange}
         onDelete={() => onDeleteService(service.id)}
+        onDuplicate={(reverse) => onDuplicateService(service.id, reverse)}
       />
     );
   }

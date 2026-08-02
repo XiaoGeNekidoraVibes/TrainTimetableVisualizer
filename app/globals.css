@@ -154,10 +154,10 @@ kbd { display: inline-block; min-width: 19px; padding: 2px 5px; border: 1px soli
 .pid-eta strong { font-family: var(--font-geist-mono), monospace; font-size: 25px; line-height: 1; }
 .pid-eta span { margin-top: 3px; color: #aab3ac; font-size: 7px; }
 .pid-route-window { position: relative; height: 101px; overflow: hidden; border-top: 1px solid rgba(255,255,255,.07); border-bottom: 1px solid rgba(255,255,255,.07); mask-image: linear-gradient(to right,transparent,#000 3%,#000 97%,transparent); }
-.pid-route-track { position: relative; width: max-content; min-width: 100%; height: 100%; display: flex; justify-content: center; padding: 13px 34px 5px; }
-.pid-route-track::before { content: ""; position: absolute; left: 55px; right: 55px; top: 52px; height: 9px; border-radius: 8px; background: linear-gradient(to right,color-mix(in srgb,var(--pid-color) 34%,#59605b),var(--pid-color)); }
-.pid-route-track.is-long { justify-content: flex-start; animation: pid-route-scroll 18s ease-in-out infinite alternate; }
-@keyframes pid-route-scroll { 0%,10% { transform: translateX(0); } 90%,100% { transform: translateX(calc(-100% + 700px)); } }
+.pid-route-track { position: relative; width: max-content; min-width: 100%; height: 100%; display: flex; justify-content: flex-start; padding: 13px 34px 5px 25%; transform: translateX(calc(-1 * var(--pid-focus-offset))); }
+.pid-route-track::before { content: ""; position: absolute; left: 24px; right: 24px; top: 52px; height: 9px; border-radius: 8px; background: linear-gradient(to right,color-mix(in srgb,var(--pid-color) 34%,#59605b),var(--pid-color)); }
+.pid-route-track.is-long { animation: pid-route-scroll 20s ease-in-out infinite alternate; }
+@keyframes pid-route-scroll { 0%,24% { transform: translateX(calc(-1 * var(--pid-focus-offset))); } 88%,100% { transform: translateX(calc(-100% + 620px)); } }
 .pid-route-stop { position: relative; z-index: 1; width: 96px; flex: 0 0 96px; display: grid; grid-template-rows: 28px 28px 15px; place-items: center; color: #dfe5df; text-align: center; }
 .pid-route-stop strong { width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .pid-route-node { width: 27px; height: 27px; display: grid; place-items: center; border: 3px solid var(--pid-color); border-radius: 50%; color: #172018; background: #eff3ef; font-family: var(--font-geist-mono), monospace; font-size: 8px; font-weight: 850; }
@@ -177,6 +177,10 @@ kbd { display: inline-block; min-width: 19px; padding: 2px 5px; border: 1px soli
 .inspector-scroll { height: 100%; overflow-y: auto; scrollbar-width: thin; scrollbar-color: #3a413b transparent; }
 .inspector-heading { min-height: 91px; display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 20px 22px; border-bottom: 1px solid var(--line); }
 .inspector-heading h2 { max-width: 245px; margin: 6px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 19px; letter-spacing: -.02em; }
+.service-copy-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 10px 15px; border-bottom: 1px solid var(--line); background: rgba(255,255,255,.018); }
+.service-copy-actions button { min-width: 0; padding: 9px 7px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--surface-2); color: var(--text); font-size: 11px; cursor: pointer; }
+.service-copy-actions button:last-child { border-color: rgba(255,174,95,.34); color: var(--accent); }
+.service-copy-actions button:hover { border-color: var(--accent); background: rgba(255,174,95,.08); }
 .object-index { color: #667068; font-family: var(--font-geist-mono), monospace; font-size: 9px; }
 .line-swatch { width: 26px; height: 5px; border-radius: 3px; }
 .validation-dot { width: 9px; height: 9px; border-radius: 50%; }
