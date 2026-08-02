@@ -49,6 +49,21 @@ type PointerState = {
   moved: boolean;
 };
 
+type RenderSnapshot = {
+  stations: Station[];
+  lines: RailLine[];
+  services: Service[];
+  compiledRoutes: Map<string, CompiledRoute>;
+  selection: Selection;
+  draftStationIds: string[];
+  stationMap: Map<string, Station>;
+  sampledLines: Map<string, ReturnType<typeof sampleLine>>;
+  showOsm: boolean;
+  osmOpacity: number;
+  getClockSeconds: () => number;
+  onActiveCountChange: (count: number) => void;
+};
+
 const WORLD_WIDTH = 1020;
 const WORLD_HEIGHT = 720;
 const OSM_TILE_SIZE = 256;
@@ -217,6 +232,50 @@ export function RailCanvas({
     () => new Map(lines.map((line) => [line.id, sampleLine(line, stationMap)])),
     [lines, stationMap],
   );
+  const renderSnapshotRef = useRef<RenderSnapshot>({
+    stations,
+    lines,
+    services,
+    compiledRoutes,
+    selection,
+    draftStationIds,
+    stationMap,
+    sampledLines,
+    showOsm,
+    osmOpacity,
+    getClockSeconds,
+    onActiveCountChange,
+  });
+
+  useEffect(() => {
+    renderSnapshotRef.current = {
+      stations,
+      lines,
+      services,
+      compiledRoutes,
+      selection,
+      draftStationIds,
+      stationMap,
+      sampledLines,
+      showOsm,
+      osmOpacity,
+      getClockSeconds,
+      onActiveCountChange,
+    };
+  }, [
+    compiledRoutes,
+    draftStationIds,
+    getClockSeconds,
+    lines,
+    onActiveCountChange,
+    osmOpacity,
+    sampledLines,
+    selection,
+    services,
+    showOsm,
+    stationMap,
+    stations,
+  ]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -251,6 +310,7 @@ export function RailCanvas({
     resize();
 
     const draw = () => {
+      const render = renderSnapshotRef.current;
       const camera = cameraRef.current;
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
       context.clearRect(0, 0, width, height);
@@ -262,12 +322,12 @@ export function RailCanvas({
       context.translate(camera.x, camera.y);
       context.scale(camera.scale, camera.scale);
 
-      if (showOsm) drawOsmBaseMap(context, width, height, camera, osmOpacity);
+      if (render.showOsm) drawOsmBaseMap(context, width, height, camera, render.osmOpacity);
 
-      for (const line of lines) {
-        const sampled = sampledLines.get(line.id);
+      for (const line of render.lines) {
+        const sampled = render.sampledLines.get(line.id);
         if (!sampled?.points.length) continue;
-        const selected = selection?.type === "line" && selection.id === line.id;
+        const selected = render.selection?.type === "line" && render.selection.id === line.id;
         context.lineCap = "round";
         context.lineJoin = "round";
         context.strokeStyle = "rgba(0, 0, 0, 0.34)";
@@ -280,9 +340,9 @@ export function RailCanvas({
         context.stroke();
       }
 
-      if (draftStationIds.length) {
-        const points = draftStationIds
-          .map((id) => stationMap.get(id)?.position)
+      if (render.draftStationIds.length) {
+        const points = render.draftStationIds
+          .map((id) => render.stationMap.get(id)?.position)
           .filter((point): point is Point => Boolean(point));
         context.save();
         context.setLineDash([8 / camera.scale, 7 / camera.scale]);
@@ -293,9 +353,9 @@ export function RailCanvas({
         context.restore();
       }
 
-      for (const station of stations) {
-        const selected = selection?.type === "station" && selection.id === station.id;
-        const drafted = draftStationIds.includes(station.id);
+      for (const station of render.stations) {
+        const selected = render.selection?.type === "station" && render.selection.id === station.id;
+        const drafted = render.draftStationIds.includes(station.id);
         const radius = (selected || drafted ? 8 : 6) / camera.scale;
         context.beginPath();
         context.arc(station.position.x, station.position.y, radius, 0, Math.PI * 2);
@@ -310,11 +370,11 @@ export function RailCanvas({
         context.fillText(station.name, station.position.x, station.position.y - 13 / camera.scale);
       }
 
-      const trains = collectActiveTrains(services, compiledRoutes, getClockSeconds());
+      const trains = collectActiveTrains(render.services, render.compiledRoutes, render.getClockSeconds());
       trainsRef.current = trains;
       if (trains.length !== activeCountRef.current) {
         activeCountRef.current = trains.length;
-        onActiveCountChange(trains.length);
+        render.onActiveCountChange(trains.length);
       }
       const visibleLeft = -camera.x / camera.scale - 30 / camera.scale;
       const visibleTop = -camera.y / camera.scale - 30 / camera.scale;
@@ -323,7 +383,7 @@ export function RailCanvas({
       const denseMode = trains.length > 2500;
       for (const train of trains) {
         if (train.x < visibleLeft || train.x > visibleRight || train.y < visibleTop || train.y > visibleBottom) continue;
-        const selected = selection?.type === "train" && selection.id === train.id && selection.serviceId === train.serviceId;
+        const selected = render.selection?.type === "train" && render.selection.id === train.id && render.selection.serviceId === train.serviceId;
         if (denseMode && !selected) {
           const unit = 1 / camera.scale;
           context.fillStyle = train.color;
@@ -357,20 +417,7 @@ export function RailCanvas({
       cancelAnimationFrame(frame);
       observer.disconnect();
     };
-  }, [
-    compiledRoutes,
-    draftStationIds,
-    getClockSeconds,
-    lines,
-    onActiveCountChange,
-    osmOpacity,
-    sampledLines,
-    selection,
-    services,
-    showOsm,
-    stationMap,
-    stations,
-  ]);
+  }, []);
 
   const findHit = (screenPoint: Point): Selection => {
     const camera = cameraRef.current;

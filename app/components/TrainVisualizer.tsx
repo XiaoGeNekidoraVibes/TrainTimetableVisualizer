@@ -21,6 +21,19 @@ import { TrainPid } from "./TrainPid";
 const LINE_COLORS = ["#e8834d", "#42a99a", "#d8b557", "#7c92df", "#c96b86"];
 const makeId = (prefix: string) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const PROJECT_STORAGE_KEY = "rail-flow:project:v2";
+const routeGeometryCache = new WeakMap<Service["routeLegs"], {
+  stations: Station[];
+  lines: RailLine[];
+  route: ReturnType<typeof compileRoute>;
+}>();
+
+function compileRouteCached(service: Service, stations: Station[], lines: RailLine[]) {
+  const cached = routeGeometryCache.get(service.routeLegs);
+  if (cached?.stations === stations && cached.lines === lines) return cached.route;
+  const route = compileRoute(service.routeLegs, stations, lines);
+  routeGeometryCache.set(service.routeLegs, { stations, lines, route });
+  return route;
+}
 
 function normalizeNetwork(data: Partial<NetworkSnapshot>): NetworkSnapshot | null {
   if (!Array.isArray(data.stations) || !Array.isArray(data.lines) || !Array.isArray(data.services)) return null;
@@ -104,13 +117,11 @@ export function TrainVisualizer() {
   const { playing: clockPlaying, setPlaying: setClockPlaying } = clock;
 
   const compiledRoutes = useMemo(
-    () => new Map(
-      network.services.map((service) => [
-        service.id,
-        compileRoute(service.routeLegs, network.stations, network.lines),
-      ]),
-    ),
-    [network],
+    () => new Map(network.services.map((service) => [
+      service.id,
+      compileRouteCached(service, network.stations, network.lines),
+    ])),
+    [network.lines, network.services, network.stations],
   );
   const selectedTrainService = selection?.type === "train"
     ? network.services.find((service) => service.id === selection.serviceId)
