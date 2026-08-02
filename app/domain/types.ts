@@ -28,12 +28,19 @@ export type TimingRule =
 export type Service = {
   id: string;
   name: string;
+  groupId?: string;
+  libraryHidden?: boolean;
   category: string;
   idFormula: string;
   departures: number[];
   routeLegs: RouteLeg[];
   timings: Record<string, TimingRule>;
   color: string;
+};
+
+export type ServiceGroup = {
+  id: string;
+  name: string;
 };
 
 export type RouteStation = {
@@ -79,4 +86,5 @@ export type NetworkSnapshot = {
   stations: Station[];
   lines: RailLine[];
   services: Service[];
+  serviceGroups: ServiceGroup[];
 };

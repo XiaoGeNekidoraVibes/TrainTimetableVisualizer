@@ -6,6 +6,7 @@ import type {
   RailLine,
   RouteLeg,
   Service,
+  ServiceGroup,
   Station,
   TimingRule,
 } from "../domain/types";
@@ -22,6 +23,7 @@ import {
 
 type ServiceEditorProps = {
   service: Service;
+  serviceGroups: ServiceGroup[];
   stations: Station[];
   lines: RailLine[];
   route: CompiledRoute;
@@ -59,6 +61,7 @@ function durationInput(value: number, onChange: (value: number) => void, label: 
 
 export function ServiceEditor({
   service,
+  serviceGroups,
   stations,
   lines,
   route,
@@ -191,6 +194,26 @@ export function ServiceEditor({
               <input type="color" value={service.color} onChange={(event) => onChange({ ...service, color: event.target.value })} />
               <code>{service.color}</code>
             </div>
+          </label>
+        </div>
+        <div className="service-organization-grid">
+          <label>
+            <span>Service 组</span>
+            <select
+              value={service.groupId ?? ""}
+              onChange={(event) => onChange({ ...service, groupId: event.target.value || undefined })}
+            >
+              <option value="">未分组</option>
+              {serviceGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
+            </select>
+          </label>
+          <label className="service-library-hidden-toggle">
+            <input
+              type="checkbox"
+              checked={Boolean(service.libraryHidden)}
+              onChange={(event) => onChange({ ...service, libraryHidden: event.target.checked })}
+            />
+            <span><strong>从管理列表隐藏</strong><small>不会影响运行模拟</small></span>
           </label>
         </div>
         <label>

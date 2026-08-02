@@ -10,12 +10,14 @@ import type {
   RailLine,
   Selection,
   Service,
+  ServiceGroup,
   Station,
   ToolMode,
 } from "../domain/types";
 import { formatTime, parseClock } from "../lib/time";
 import { Inspector } from "./Inspector";
 import { RailCanvas } from "./RailCanvas";
+import { ServiceLibrary } from "./ServiceLibrary";
 import { StationDisplay } from "./StationDisplay";
 import { TrainPid } from "./TrainPid";
 
@@ -38,14 +40,21 @@ function compileRouteCached(service: Service, stations: Station[], lines: RailLi
 
 function normalizeNetwork(data: Partial<NetworkSnapshot>): NetworkSnapshot | null {
   if (!Array.isArray(data.stations) || !Array.isArray(data.lines) || !Array.isArray(data.services)) return null;
+  const serviceGroups = Array.isArray(data.serviceGroups)
+    ? data.serviceGroups.filter((group) => group && typeof group.id === "string" && typeof group.name === "string")
+    : [];
+  const groupIds = new Set(serviceGroups.map((group) => group.id));
   return {
     stations: data.stations,
     lines: data.lines,
     services: data.services.map((service, index) => ({
       ...service,
+      groupId: service.groupId && groupIds.has(service.groupId) ? service.groupId : undefined,
+      libraryHidden: Boolean(service.libraryHidden),
       category: service.category || "普通",
       color: service.color || LINE_COLORS[index % LINE_COLORS.length],
     })),
+    serviceGroups,
   };
 }
 
@@ -146,7 +155,7 @@ export function TrainVisualizer() {
 
   const saveProject = useCallback(() => {
     try {
-      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 2, ...network }));
+      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 3, ...network }));
       setNotice(`已保存到本机 · ${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`);
     } catch {
       setNotice("保存失败：浏览器未允许本地存储");
@@ -155,14 +164,14 @@ export function TrainVisualizer() {
 
   const createNewProject = () => {
     if (!window.confirm("新建项目会清空当前画布。未保存的更改将无法恢复，是否继续？")) return;
-    const empty: NetworkSnapshot = { stations: [], lines: [], services: [] };
+    const empty: NetworkSnapshot = { stations: [], lines: [], services: [], serviceGroups: [] };
     setNetwork(empty);
     setSelection(null);
     setDraftStationIds([]);
     setStationDisplay(null);
     setTool("station");
     try {
-      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 2, ...empty }));
+      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 3, ...empty }));
     } catch {
       // The empty project still remains available for the current session.
     }
@@ -214,6 +223,7 @@ export function TrainVisualizer() {
     const service: Service = {
       id,
       name: `新 Service ${network.services.length + 1}`,
+      groupId: network.serviceGroups.length === 1 ? network.serviceGroups[0].id : undefined,
       category: "普通",
       idFormula: "T{100+n}",
       departures: [21600],
@@ -227,6 +237,62 @@ export function TrainVisualizer() {
     setNetwork((current) => ({ ...current, services: [...current.services, service] }));
     setSelection({ type: "service", id });
     setNotice("Service 已创建，请完善路径和时间约束");
+  };
+
+  const createServiceGroup = () => {
+    const name = window.prompt("Service 组名称", `运行方案 ${network.serviceGroups.length + 1}`)?.trim();
+    if (!name) return;
+    const group: ServiceGroup = { id: makeId("service-group"), name };
+    setNetwork((current) => ({ ...current, serviceGroups: [...current.serviceGroups, group] }));
+    setNotice(`已创建 Service 组“${name}”`);
+  };
+
+  const renameServiceGroup = (group: ServiceGroup) => {
+    const name = window.prompt("重命名 Service 组", group.name)?.trim();
+    if (!name || name === group.name) return;
+    setNetwork((current) => ({
+      ...current,
+      serviceGroups: current.serviceGroups.map((item) => item.id === group.id ? { ...item, name } : item),
+    }));
+    setNotice(`Service 组已重命名为“${name}”`);
+  };
+
+  const deleteServiceGroup = (group: ServiceGroup) => {
+    if (!window.confirm(`删除分组“${group.name}”？组内 Service 会移至“未分组”，不会被删除。`)) return;
+    setNetwork((current) => ({
+      ...current,
+      serviceGroups: current.serviceGroups.filter((item) => item.id !== group.id),
+      services: current.services.map((service) => service.groupId === group.id
+        ? { ...service, groupId: undefined }
+        : service),
+    }));
+    setNotice(`已删除分组“${group.name}”，组内 Service 已移至未分组`);
+  };
+
+  const setServiceHidden = (serviceId: string, hidden: boolean) => {
+    setNetwork((current) => ({
+      ...current,
+      services: current.services.map((service) => service.id === serviceId
+        ? { ...service, libraryHidden: hidden }
+        : service),
+    }));
+    setNotice(hidden ? "Service 已从管理列表隐藏，运行模拟不受影响" : "Service 已恢复到管理列表");
+  };
+
+  const setServiceGroupHidden = (groupId: string | undefined, hidden: boolean) => {
+    setNetwork((current) => {
+      const knownGroupIds = new Set(current.serviceGroups.map((group) => group.id));
+      return {
+        ...current,
+        services: current.services.map((service) => {
+          const belongs = groupId
+            ? service.groupId === groupId
+            : !service.groupId || !knownGroupIds.has(service.groupId);
+          return belongs ? { ...service, libraryHidden: hidden } : service;
+        }),
+      };
+    });
+    setNotice(hidden ? "本组 Service 已从管理列表隐藏" : "本组 Service 已恢复显示");
   };
 
   const duplicateService = (serviceId: string, reverse: boolean) => {
@@ -273,6 +339,7 @@ export function TrainVisualizer() {
       ...source,
       id,
       name: `${source.name} · ${reverse ? "反向" : "副本"}`,
+      libraryHidden: false,
       departures: [...source.departures],
       routeLegs,
       timings,
@@ -283,7 +350,7 @@ export function TrainVisualizer() {
   };
 
   const exportProject = () => {
-    const blob = new Blob([JSON.stringify({ version: 1, ...network }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ version: 3, ...network }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -419,18 +486,18 @@ export function TrainVisualizer() {
             ))}
           </div>
         </section>
-        <section className="library-section service-library">
-          <div className="library-title"><span>Services</span><button type="button" onClick={createService}>＋ 新建</button></div>
-          <div className="entity-list">
-            {network.services.map((service) => (
-              <button key={service.id} className={selection?.type === "service" && selection.id === service.id ? "selected" : ""} onClick={() => setSelection({ type: "service", id: service.id })}>
-                <span className="service-monogram" style={{ borderColor: service.color }}>{service.name.slice(0, 1)}</span>
-                <span><strong>{service.name}</strong><small>{service.departures.length} 个班次</small></span>
-                <i>›</i>
-              </button>
-            ))}
-          </div>
-        </section>
+        <ServiceLibrary
+          groups={network.serviceGroups}
+          services={network.services}
+          selection={selection}
+          onSelect={(id) => setSelection({ type: "service", id })}
+          onCreateService={createService}
+          onCreateGroup={createServiceGroup}
+          onRenameGroup={renameServiceGroup}
+          onDeleteGroup={deleteServiceGroup}
+          onSetServiceHidden={setServiceHidden}
+          onSetGroupHidden={setServiceGroupHidden}
+        />
         <div className="library-footer"><span className="status-light" />本地项目 · Ctrl+S 保存</div>
       </aside>
 
@@ -501,6 +568,7 @@ export function TrainVisualizer() {
           stations={network.stations}
           lines={network.lines}
           services={network.services}
+          serviceGroups={network.serviceGroups}
           routes={compiledRoutes}
           onStationChange={(next) => setNetwork((current) => ({ ...current, stations: current.stations.map((item) => item.id === next.id ? next : item) }))}
           onLineChange={(next) => setNetwork((current) => ({ ...current, lines: current.lines.map((item) => item.id === next.id ? next : item) }))}

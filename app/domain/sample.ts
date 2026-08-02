@@ -3,6 +3,7 @@ import type { NetworkSnapshot, Service } from "./types";
 const rapid: Service = {
   id: "service-r1",
   name: "晨光快线",
+  groupId: "service-group-daily",
   category: "高速",
   idFormula: "G{100+n*2}",
   departures: [21600, 23400, 25200, 27000, 28800, 30600],
@@ -23,6 +24,7 @@ const rapid: Service = {
 const local: Service = {
   id: "service-l2",
   name: "环城通勤",
+  groupId: "service-group-daily",
   category: "普通",
   idFormula: "C{20+n}",
   departures: [22200, 23100, 24000, 24900, 25800, 26700, 27600, 28500],
@@ -39,6 +41,7 @@ const local: Service = {
 };
 
 export const initialNetwork: NetworkSnapshot = {
+  serviceGroups: [{ id: "service-group-daily", name: "日常运行" }],
   stations: [
     { id: "s-west", name: "西郊", position: { x: 160, y: 390 } },
     { id: "s-river", name: "江湾", position: { x: 350, y: 315 } },

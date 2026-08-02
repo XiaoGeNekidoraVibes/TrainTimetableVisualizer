@@ -6,6 +6,7 @@ import type {
   RailLine,
   Selection,
   Service,
+  ServiceGroup,
   Station,
 } from "../domain/types";
 import { ServiceEditor } from "./ServiceEditor";
@@ -15,6 +16,7 @@ type InspectorProps = {
   stations: Station[];
   lines: RailLine[];
   services: Service[];
+  serviceGroups: ServiceGroup[];
   routes: Map<string, CompiledRoute>;
   onStationChange: (station: Station) => void;
   onLineChange: (line: RailLine) => void;
@@ -67,6 +69,7 @@ export function Inspector({
   stations,
   lines,
   services,
+  serviceGroups,
   routes,
   onStationChange,
   onLineChange,
@@ -99,6 +102,7 @@ export function Inspector({
       <ServiceEditor
         key={service.id}
         service={service}
+        serviceGroups={serviceGroups}
         stations={stations}
         lines={lines}
         route={routes.get(service.id)!}
