@@ -85,13 +85,11 @@ function stoppingStationNames(
   service: Service,
   route: CompiledRoute,
   stationMap: Map<string, Station>,
-  relativeTime: number,
+  afterStationIndex: number,
 ) {
   return route.stations
-    .filter((station) => {
-      const rule = service.timings[station.occurrenceKey];
-      return rule?.mode === "stop" && rule.departure >= relativeTime;
-    })
+    .slice(afterStationIndex + 1)
+    .filter((station) => service.timings[station.occurrenceKey]?.mode === "stop")
     .map((station) => stationMap.get(station.stationId)?.name ?? "已删除站点");
 }
 
@@ -109,13 +107,16 @@ export function getStationBoardEvents(
   for (const service of services) {
     const route = routes.get(service.id);
     if (!route?.valid || validateSchedule(service, route)) continue;
-    const routeStations = route.stations.filter((station) => station.stationId === stationId);
+    const routeStations = route.stations
+      .map((station, index) => ({ station, index }))
+      .filter(({ station }) => station.stationId === stationId);
     if (!routeStations.length) continue;
     const labels = routeLabels(route, stationMap);
     const lineIds = stationLineIds(service, stationId, lines);
-    for (const routeStation of routeStations) {
+    for (const { station: routeStation, index: routeStationIndex } of routeStations) {
       const timing = timingAtStation(service, route, routeStation.occurrenceKey, routeStation.distance);
       if (!timing) continue;
+      const onwardStops = stoppingStationNames(service, route, stationMap, routeStationIndex);
       for (let departureIndex = 0; departureIndex < service.departures.length; departureIndex += 1) {
         for (const dayShift of [-86400, 0, 86400]) {
           const base = service.departures[departureIndex] + dayShift;
@@ -138,7 +139,7 @@ export function getStationBoardEvents(
               referenceTime,
               countdown: Math.max(0, referenceTime - clockSeconds),
               status: dwelling ? "dwelling" : "arriving",
-              stoppingStations: stoppingStationNames(service, route, stationMap, clockSeconds - base),
+              stoppingStations: onwardStops,
               lineIds,
             });
           } else {
@@ -156,7 +157,7 @@ export function getStationBoardEvents(
               referenceTime: passTime,
               countdown: Math.max(0, passTime - clockSeconds),
               status: "passing",
-              stoppingStations: stoppingStationNames(service, route, stationMap, clockSeconds - base),
+              stoppingStations: onwardStops,
               lineIds,
             });
           }
