@@ -44,7 +44,9 @@ type PointerState = {
   pointerId: number;
   startClient: Point;
   lastClient: Point;
+  startingHit: Selection;
   draggingStationId?: string;
+  stationGrabOffset?: Point;
   panning: boolean;
   moved: boolean;
 };
@@ -72,6 +74,7 @@ const OSM_MIN_ZOOM = 2;
 const OSM_MAX_ZOOM = 19;
 const EARTH_CIRCUMFERENCE_METERS = 40_075_016.686;
 const OSM_CENTER = { longitude: 121.4737, latitude: 31.2304 };
+const POINTER_DRAG_THRESHOLD = 8;
 const osmTileCache = new Map<string, HTMLImageElement | null>();
 
 function longitudeToPixel(longitude: number, zoom: number) {
@@ -526,20 +529,23 @@ export function RailCanvas({
     const point = eventPoint(event, canvas);
     const hit = findHit(point);
     canvas.setPointerCapture(event.pointerId);
-    if (tool === "line") {
-      if (hit?.type === "station") onAppendDraftStation(hit.id);
-      return;
-    }
-    if (tool === "station") return;
+    const draggedStation = tool === "select" && hit?.type === "station"
+      ? stations.find((station) => station.id === hit.id)
+      : undefined;
+    const worldPoint = screenToWorld(point, cameraRef.current);
     pointerRef.current = {
       pointerId: event.pointerId,
       startClient: point,
       lastClient: point,
-      draggingStationId: hit?.type === "station" ? hit.id : undefined,
-      panning: !hit,
+      startingHit: hit,
+      draggingStationId: draggedStation?.id,
+      stationGrabOffset: draggedStation ? {
+        x: draggedStation.position.x - worldPoint.x,
+        y: draggedStation.position.y - worldPoint.y,
+      } : undefined,
+      panning: tool !== "select" || hit?.type !== "station",
       moved: false,
     };
-    if (hit) onSelect(hit);
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
@@ -547,13 +553,25 @@ export function RailCanvas({
     const pointer = pointerRef.current;
     if (!canvas || !pointer || pointer.pointerId !== event.pointerId) return;
     const point = eventPoint(event, canvas);
+    const movement = Math.hypot(
+      point.x - pointer.startClient.x,
+      point.y - pointer.startClient.y,
+    );
+    if (!pointer.moved && movement < POINTER_DRAG_THRESHOLD) return;
+    if (!pointer.moved) {
+      pointer.moved = true;
+      if (pointer.draggingStationId) {
+        onSelect({ type: "station", id: pointer.draggingStationId });
+      }
+    }
     const dx = point.x - pointer.lastClient.x;
     const dy = point.y - pointer.lastClient.y;
-    if (Math.hypot(point.x - pointer.startClient.x, point.y - pointer.startClient.y) > 3) {
-      pointer.moved = true;
-    }
     if (pointer.draggingStationId) {
-      onMoveStation(pointer.draggingStationId, screenToWorld(point, cameraRef.current));
+      const world = screenToWorld(point, cameraRef.current);
+      onMoveStation(pointer.draggingStationId, {
+        x: world.x + (pointer.stationGrabOffset?.x ?? 0),
+        y: world.y + (pointer.stationGrabOffset?.y ?? 0),
+      });
     } else if (pointer.panning) {
       cameraRef.current.x += dx;
       cameraRef.current.y += dy;
@@ -565,11 +583,16 @@ export function RailCanvas({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const point = eventPoint(event, canvas);
-    if (tool === "station") {
+    const pointer = pointerRef.current;
+    if (pointer && pointer.pointerId === event.pointerId && !pointer.moved) {
       const hit = findHit(point);
-      if (!hit) onAddStation(screenToWorld(point, cameraRef.current));
-    } else if (tool === "select" && pointerRef.current && !pointerRef.current.moved) {
-      onSelect(findHit(point));
+      if (tool === "station" && !hit) {
+        onAddStation(screenToWorld(point, cameraRef.current));
+      } else if (tool === "line" && hit?.type === "station") {
+        onAppendDraftStation(hit.id);
+      } else if (tool === "select") {
+        onSelect(hit);
+      }
     }
     pointerRef.current = null;
     if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
