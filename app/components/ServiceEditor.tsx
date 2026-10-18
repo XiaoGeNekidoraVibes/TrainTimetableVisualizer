@@ -12,6 +12,7 @@ import type {
 } from "../domain/types";
 import { validateSchedule } from "../domain/simulation";
 import { createUniformSchedule, getTimingIntervals } from "../domain/schedule";
+import { timingPlatform } from "../domain/platform";
 import {
   createDepartureRange,
   formatDuration,
@@ -332,16 +333,17 @@ export function ServiceEditor({
           </div>
           <div className="timing-list">
             {route.stations.map((routeStation, index) => {
-              const rule = service.timings[routeStation.occurrenceKey] ?? { mode: "pass-flexible" as const };
+              const rule = service.timings[routeStation.occurrenceKey] ?? { mode: "pass-flexible" as const, platform: null };
+              const platform = timingPlatform(rule);
               const defaultTime = Math.round((index / Math.max(1, route.stations.length - 1)) * 1800);
               const interval = timingIntervals.get(routeStation.occurrenceKey);
               const nextIntervalStation = interval
                 ? route.stations.find((station) => station.occurrenceKey === interval.nextOccurrenceKey)
                 : undefined;
               const setMode = (mode: TimingRule["mode"]) => {
-                if (mode === "stop") setTiming(routeStation.occurrenceKey, { mode, arrival: defaultTime, departure: defaultTime + (index ? 60 : 0) });
-                else if (mode === "pass-exact") setTiming(routeStation.occurrenceKey, { mode, pass: defaultTime });
-                else setTiming(routeStation.occurrenceKey, { mode });
+                if (mode === "stop") setTiming(routeStation.occurrenceKey, { mode, platform: platform ?? "1", arrival: defaultTime, departure: defaultTime + (index ? 60 : 0) });
+                else if (mode === "pass-exact") setTiming(routeStation.occurrenceKey, { mode, platform, pass: defaultTime });
+                else setTiming(routeStation.occurrenceKey, { mode, platform });
               };
               return (
                 <div className="timing-row" key={routeStation.occurrenceKey}>
@@ -366,6 +368,31 @@ export function ServiceEditor({
                     {rule.mode === "pass-exact" && durationInput(rule.pass, (pass) => setTiming(routeStation.occurrenceKey, { ...rule, pass }), "相对通过时间")}
                     {rule.mode === "pass-flexible" && <span className="free-time">自动求解</span>}
                   </div>
+                  <label className="timing-platform">
+                    <span>{rule.mode === "stop" ? "停靠站台" : "通过站台"}</span>
+                    <input
+                      type="text"
+                      aria-label={`${stationMap.get(routeStation.stationId)?.name}站台`}
+                      value={rule.platform ?? ""}
+                      placeholder={rule.mode === "stop" ? "填写站台" : "无站台（正线通过）"}
+                      required={rule.mode === "stop"}
+                      onChange={(event) => setTiming(routeStation.occurrenceKey, rule.mode === "stop"
+                        ? { ...rule, platform: event.target.value }
+                        : { ...rule, platform: event.target.value || null })}
+                      onBlur={(event) => {
+                        const value = event.target.value.trim();
+                        const nextPlatform = value || (rule.mode === "stop" ? platform ?? "1" : null);
+                        event.target.value = nextPlatform ?? "";
+                        if (nextPlatform === rule.platform) return;
+                        setTiming(routeStation.occurrenceKey, rule.mode === "stop"
+                          ? { ...rule, platform: nextPlatform ?? "1" }
+                          : { ...rule, platform: nextPlatform });
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") event.currentTarget.blur();
+                      }}
+                    />
+                  </label>
                   {interval && nextIntervalStation && (
                     <div className="interval-speed">
                       <span>下一定时区间</span>
@@ -377,6 +404,7 @@ export function ServiceEditor({
               );
             })}
           </div>
+          <p className="field-note">站台可填写数字或名称；通过列车留空表示正线通过。</p>
           <div className={`validation-message ${error ? "error" : "success"}`}>
             <span>{error ? "!" : "✓"}</span>
             {error ?? "路径与全部时间约束有效"}

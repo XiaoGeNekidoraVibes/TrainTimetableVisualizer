@@ -13,11 +13,11 @@ const rapid: Service = {
     { id: "leg-r1-2", lineId: "line-teal", fromStationId: "s-central", toStationId: "s-harbor" },
   ],
   timings: {
-    "s-west:0": { mode: "stop", arrival: 0, departure: 0 },
-    "s-river:0": { mode: "pass-flexible" },
-    "s-central:0": { mode: "stop", arrival: 620, departure: 740 },
-    "s-tech:0": { mode: "pass-exact", pass: 1120 },
-    "s-harbor:0": { mode: "stop", arrival: 1620, departure: 1620 },
+    "s-west:0": { mode: "stop", platform: "1", arrival: 0, departure: 0 },
+    "s-river:0": { mode: "pass-flexible", platform: null },
+    "s-central:0": { mode: "stop", platform: "1", arrival: 620, departure: 740 },
+    "s-tech:0": { mode: "pass-exact", platform: "2", pass: 1120 },
+    "s-harbor:0": { mode: "stop", platform: "1", arrival: 1620, departure: 1620 },
   },
 };
 
@@ -33,10 +33,10 @@ const local: Service = {
     { id: "leg-l2-1", lineId: "line-teal", fromStationId: "s-north", toStationId: "s-harbor" },
   ],
   timings: {
-    "s-north:0": { mode: "stop", arrival: 0, departure: 0 },
-    "s-central:0": { mode: "stop", arrival: 430, departure: 490 },
-    "s-tech:0": { mode: "stop", arrival: 790, departure: 850 },
-    "s-harbor:0": { mode: "stop", arrival: 1280, departure: 1280 },
+    "s-north:0": { mode: "stop", platform: "1", arrival: 0, departure: 0 },
+    "s-central:0": { mode: "stop", platform: "2", arrival: 430, departure: 490 },
+    "s-tech:0": { mode: "stop", platform: "1", arrival: 790, departure: 850 },
+    "s-harbor:0": { mode: "stop", platform: "2", arrival: 1280, departure: 1280 },
   },
 };
 

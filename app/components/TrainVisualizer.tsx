@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compileRoute } from "../domain/geometry";
 import { initialNetwork } from "../domain/sample";
-import { buildAnchors } from "../domain/simulation";
+import { createReversedSchedule } from "../domain/schedule";
+import { normalizeTimingPlatform } from "../domain/platform";
 import type {
   NetworkSnapshot,
   Point,
@@ -53,6 +54,9 @@ function normalizeNetwork(data: Partial<NetworkSnapshot>): NetworkSnapshot | nul
       libraryHidden: Boolean(service.libraryHidden),
       category: service.category || "普通",
       color: service.color || LINE_COLORS[index % LINE_COLORS.length],
+      timings: Object.fromEntries(Object.entries(service.timings).map(([key, rule]) => [
+        key, normalizeTimingPlatform(rule),
+      ])),
     })),
     serviceGroups,
   };
@@ -157,7 +161,7 @@ export function TrainVisualizer() {
 
   const saveProject = useCallback(() => {
     try {
-      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 3, ...network }));
+      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 4, ...network }));
       setNotice(`已保存到本机 · ${new Date().toLocaleTimeString("zh-CN", { hour12: false })}`);
     } catch {
       setNotice("保存失败：浏览器未允许本地存储");
@@ -173,7 +177,7 @@ export function TrainVisualizer() {
     setStationDisplay(null);
     setTool("station");
     try {
-      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 3, ...empty }));
+      window.localStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify({ version: 4, ...empty }));
     } catch {
       // The empty project still remains available for the current session.
     }
@@ -232,8 +236,8 @@ export function TrainVisualizer() {
       color: LINE_COLORS[(network.services.length + 2) % LINE_COLORS.length],
       routeLegs: [{ id: makeId("leg"), lineId: line.id, fromStationId: first, toStationId: last }],
       timings: {
-        [`${first}:0`]: { mode: "stop", arrival: 0, departure: 0 },
-        [`${last}:0`]: { mode: "stop", arrival: 1800, departure: 1800 },
+        [`${first}:0`]: { mode: "stop", platform: "1", arrival: 0, departure: 0 },
+        [`${last}:0`]: { mode: "stop", platform: "1", arrival: 1800, departure: 1800 },
       },
     };
     setNetwork((current) => ({ ...current, services: [...current.services, service] }));
@@ -316,25 +320,7 @@ export function TrainVisualizer() {
     if (reverse) {
       const sourceRoute = compiledRoutes.get(source.id);
       const reversedRoute = compileRoute(routeLegs, network.stations, network.lines);
-      const duration = sourceRoute ? buildAnchors(source, sourceRoute).at(-1)?.time ?? 0 : 0;
-      timings = {};
-      if (sourceRoute?.valid && reversedRoute.valid && sourceRoute.stations.length === reversedRoute.stations.length) {
-        reversedRoute.stations.forEach((station, index) => {
-          const sourceStation = sourceRoute.stations[sourceRoute.stations.length - 1 - index];
-          const rule = source.timings[sourceStation.occurrenceKey];
-          if (!rule || rule.mode === "pass-flexible") {
-            timings[station.occurrenceKey] = { mode: "pass-flexible" };
-          } else if (rule.mode === "pass-exact") {
-            timings[station.occurrenceKey] = { mode: "pass-exact", pass: duration - rule.pass };
-          } else {
-            timings[station.occurrenceKey] = {
-              mode: "stop",
-              arrival: duration - rule.departure,
-              departure: duration - rule.arrival,
-            };
-          }
-        });
-      }
+      timings = createReversedSchedule(source, sourceRoute, reversedRoute);
     }
 
     const duplicate: Service = {
@@ -348,11 +334,11 @@ export function TrainVisualizer() {
     };
     setNetwork((current) => ({ ...current, services: [...current.services, duplicate] }));
     setSelection({ type: "service", id });
-    setNotice(reverse ? "已复制并反转 Service，路径与相对时刻均已镜像" : "已复制 Service");
+    setNotice(reverse ? "已复制并反转 Service，路径与相对时刻均已镜像，数字站台已按奇偶互换" : "已复制 Service");
   };
 
   const exportProject = () => {
-    const blob = new Blob([JSON.stringify({ version: 3, ...network }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ version: 4, ...network }, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;

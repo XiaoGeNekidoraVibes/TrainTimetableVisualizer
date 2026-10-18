@@ -1,4 +1,5 @@
 import { buildAnchors, formatTrainId, validateSchedule } from "./simulation";
+import { timingPlatform } from "./platform";
 import type { CompiledRoute, RailLine, Service, Station, TimingRule } from "./types";
 
 export type StationEvent = {
@@ -10,6 +11,7 @@ export type StationEvent = {
   trainId: string;
   origin: string;
   destination: string;
+  platform: string | null;
   arrival?: number;
   departure?: number;
   passTime?: number;
@@ -28,6 +30,7 @@ export type TimetableDeparture = {
   color: string;
   trainId: string;
   destination: string;
+  platform: string | null;
   time: number;
   passing: boolean;
   lineIds: string[];
@@ -67,7 +70,7 @@ function flexiblePassOffset(service: Service, route: CompiledRoute, distance: nu
 }
 
 function timingAtStation(service: Service, route: CompiledRoute, occurrenceKey: string, distance: number) {
-  const rule: TimingRule = service.timings[occurrenceKey] ?? { mode: "pass-flexible" };
+  const rule: TimingRule = service.timings[occurrenceKey] ?? { mode: "pass-flexible", platform: null };
   if (rule.mode === "stop") return { kind: "stop" as const, arrival: rule.arrival, departure: rule.departure };
   if (rule.mode === "pass-exact") return { kind: "pass" as const, pass: rule.pass };
   const pass = flexiblePassOffset(service, route, distance);
@@ -77,7 +80,7 @@ function timingAtStation(service: Service, route: CompiledRoute, occurrenceKey: 
 function routeLabels(route: CompiledRoute, stationMap: Map<string, Station>) {
   return {
     origin: stationMap.get(route.stations[0]?.stationId)?.name ?? "—",
-    destination: stationMap.get(route.stations.at(-1)?.stationId)?.name ?? "—",
+    destination: stationMap.get(route.stations.at(-1)?.stationId ?? "")?.name ?? "—",
   };
 }
 
@@ -116,6 +119,7 @@ export function getStationBoardEvents(
     for (const { station: routeStation, index: routeStationIndex } of routeStations) {
       const timing = timingAtStation(service, route, routeStation.occurrenceKey, routeStation.distance);
       if (!timing) continue;
+      const platform = timingPlatform(service.timings[routeStation.occurrenceKey]);
       const onwardStops = stoppingStationNames(service, route, stationMap, routeStationIndex);
       for (let departureIndex = 0; departureIndex < service.departures.length; departureIndex += 1) {
         for (const dayShift of [-86400, 0, 86400]) {
@@ -134,6 +138,7 @@ export function getStationBoardEvents(
               color: service.color,
               trainId: formatTrainId(service.idFormula, departureIndex + 1),
               ...labels,
+              platform,
               arrival,
               departure,
               referenceTime,
@@ -153,6 +158,7 @@ export function getStationBoardEvents(
               color: service.color,
               trainId: formatTrainId(service.idFormula, departureIndex + 1),
               ...labels,
+              platform,
               passTime,
               referenceTime: passTime,
               countdown: Math.max(0, passTime - clockSeconds),
@@ -195,6 +201,7 @@ export function getStationTimetable(
           color: service.color,
           trainId: formatTrainId(service.idFormula, departureIndex + 1),
           destination: labels.destination,
+          platform: timingPlatform(service.timings[routeStation.occurrenceKey]),
           time: normalizeDay(service.departures[departureIndex] + offset),
           passing: timing.kind === "pass",
           lineIds,

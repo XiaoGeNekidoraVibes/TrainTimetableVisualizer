@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { getStationBoardEvents, getStationTimetable } from "../domain/stationBoard";
+import { getStationPlatforms, matchesPlatforms, platformLabel } from "../domain/platform";
 import type { CompiledRoute, RailLine, Service, Station } from "../domain/types";
 import { formatDuration, formatTime } from "../lib/time";
 
@@ -22,6 +23,7 @@ const FIELD_LABELS = {
   trainId: "车次",
   origin: "始发站",
   destination: "终到站",
+  platform: "站台",
   arrival: "到达",
   departure: "发车",
   countdown: "动态时间",
@@ -49,13 +51,14 @@ export function StationDisplay({
   const [showPassing, setShowPassing] = useState(false);
   const [precision, setPrecision] = useState<"minute" | "second">("minute");
   const [selectedLineIds, setSelectedLineIds] = useState<string[]>([]);
-  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<(string | null)[] | null>(null);
   const [destinationMarks, setDestinationMarks] = useState<Record<string, string>>({});
   const [fields, setFields] = useState<Record<FieldKey, boolean>>({
     category: true,
     trainId: true,
     origin: true,
     destination: true,
+    platform: true,
     arrival: true,
     departure: true,
     countdown: true,
@@ -64,6 +67,10 @@ export function StationDisplay({
 
   const station = stations.find((item) => item.id === stationId) ?? stations[0];
   const availableLines = lines.filter((line) => line.stationIds.includes(station?.id));
+  const availablePlatforms = useMemo(
+    () => station ? getStationPlatforms(station.id, services, routes) : [],
+    [routes, services, station],
+  );
   const boardEvents = useMemo(
     () => station ? getStationBoardEvents(station.id, services, routes, stations, lines, clockSeconds) : [],
     [clockSeconds, lines, routes, services, station, stations],
@@ -74,15 +81,14 @@ export function StationDisplay({
   );
 
   const filteredBoardEvents = boardEvents.filter((event) =>
-    (showPassing || event.status !== "passing") && filterByLines(event.lineIds, selectedLineIds),
-  );
-  const timetableServices = Array.from(
-    new Map(timetable.map((event) => [event.serviceId, event])).values(),
+    (showPassing || event.status !== "passing")
+    && filterByLines(event.lineIds, selectedLineIds)
+    && matchesPlatforms(event.platform, selectedPlatforms),
   );
   const filteredTimetable = timetable.filter((event) =>
     (showPassing || !event.passing)
     && filterByLines(event.lineIds, selectedLineIds)
-    && (!selectedServiceIds.length || selectedServiceIds.includes(event.serviceId)),
+    && matchesPlatforms(event.platform, selectedPlatforms),
   );
   const timetableDestinations = Array.from(new Set(filteredTimetable.map((event) => event.destination)));
   const showDestinationMarks = timetableDestinations.length > 1;
@@ -96,11 +102,33 @@ export function StationDisplay({
       : [...current, lineId]);
   };
 
-  const toggleService = (serviceId: string) => {
-    setSelectedServiceIds((current) => current.includes(serviceId)
-      ? current.filter((id) => id !== serviceId)
-      : [...current, serviceId]);
+  const togglePlatform = (platform: string | null) => {
+    setSelectedPlatforms((current) => current === null ? [platform] : current.includes(platform)
+      ? current.filter((item) => item !== platform)
+      : [...current, platform]);
   };
+
+  const platformFilters = (
+    <div className="station-platform-filter" aria-label="选择显示站台">
+      <span>显示站台</span>
+      <button
+        type="button"
+        className={selectedPlatforms === null ? "active" : ""}
+        aria-pressed={selectedPlatforms === null}
+        onClick={() => setSelectedPlatforms(null)}
+      >全部</button>
+      {availablePlatforms.map((platform) => (
+        <button
+          type="button"
+          key={platform === null ? "none" : `platform:${platform}`}
+          className={selectedPlatforms?.includes(platform) ? "active" : ""}
+          aria-pressed={selectedPlatforms?.includes(platform) ?? false}
+          onClick={() => togglePlatform(platform)}
+        >{platformLabel(platform)}</button>
+      ))}
+      {view === "timetable" && showPassing && <span className="passing-legend"><i />下划线表示通过</span>}
+    </div>
+  );
 
   return (
     <div className="station-display-layer" onMouseDown={(event) => {
@@ -128,7 +156,7 @@ export function StationDisplay({
           <select value={station?.id} onChange={(event) => {
             setStationId(event.target.value);
             setSelectedLineIds([]);
-            setSelectedServiceIds([]);
+            setSelectedPlatforms(null);
           }}>
             {stations.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
@@ -162,6 +190,7 @@ export function StationDisplay({
               ))}
             </div>
           </div>
+          {platformFilters}
           <div className="departure-board-table-wrap">
             <table className="departure-board-table">
               <thead><tr>
@@ -170,6 +199,7 @@ export function StationDisplay({
                 {fields.trainId && <th>车次</th>}
                 {fields.origin && <th>始发站</th>}
                 {fields.destination && <th>终到站</th>}
+                {fields.platform && <th>站台</th>}
                 {fields.arrival && <th>到达时间</th>}
                 {fields.departure && <th>发车时间</th>}
                 {fields.countdown && <th>距离下一节点</th>}
@@ -185,6 +215,7 @@ export function StationDisplay({
                     {fields.trainId && <td><strong className="board-train-id">{event.trainId}</strong></td>}
                     {fields.origin && <td>{event.origin}</td>}
                     {fields.destination && <td>{event.destination}</td>}
+                    {fields.platform && <td className="board-platform">{event.platform ?? "无站台"}</td>}
                     {fields.arrival && <td className="board-time">{event.arrival === undefined ? "通过" : formatTime(event.arrival)}</td>}
                     {fields.departure && <td className="board-time">{event.departure === undefined ? "—" : formatTime(event.departure)}</td>}
                     {fields.countdown && <td><div className="countdown-cell"><span>{event.status === "dwelling" ? "距发车" : event.status === "passing" ? "距通过" : "距到达"}</span><strong>{formatDuration(event.countdown)}</strong></div></td>}
@@ -205,24 +236,7 @@ export function StationDisplay({
               <button className={precision === "second" ? "active" : ""} onClick={() => setPrecision("second")}>精确到秒</button>
             </div>
           </div>
-          <div className="timetable-service-filter" aria-label="选择时刻表 Service">
-            <span>显示 Service</span>
-            <button
-              type="button"
-              className={!selectedServiceIds.length ? "active" : ""}
-              onClick={() => setSelectedServiceIds([])}
-            >全部</button>
-            {timetableServices.map((item) => (
-              <button
-                type="button"
-                key={item.serviceId}
-                className={selectedServiceIds.includes(item.serviceId) ? "active" : ""}
-                style={{ "--filter-color": item.color } as CSSProperties}
-                onClick={() => toggleService(item.serviceId)}
-              ><i />{item.category} · {item.serviceName}</button>
-            ))}
-            {showPassing && <span className="passing-legend"><i />下划线表示通过</span>}
-          </div>
+          {platformFilters}
           <div className="timetable-columns">
             {[Array.from({ length: 12 }, (_, index) => index), Array.from({ length: 12 }, (_, index) => index + 12)].map((hours, columnIndex) => (
               <div className="timetable-column" key={columnIndex}>
@@ -241,7 +255,7 @@ export function StationDisplay({
                               key={departure.key}
                               className={`timetable-departure ${showDestinationMarks ? "has-destination-mark" : ""}`}
                               style={{ color: departure.color }}
-                              title={`${departure.category} ${departure.trainId} → ${departure.destination} · ${formatTime(departure.time)}`}
+                              title={`${departure.category} ${departure.trainId} → ${departure.destination} · ${platformLabel(departure.platform)} · ${formatTime(departure.time)}`}
                             >
                               {showDestinationMarks && <small className="destination-mark">{destinationMark(departure.destination)}</small>}
                               <span className={`timetable-minute ${departure.passing ? "is-passing" : ""}`}>

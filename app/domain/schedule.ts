@@ -1,4 +1,5 @@
 import { buildAnchors } from "./simulation";
+import { reversePlatform, timingPlatform } from "./platform";
 import type { CompiledRoute, RailLine, Service, TimingRule } from "./types";
 
 export type ResolvedStationTime = {
@@ -11,6 +12,36 @@ export type TimingIntervalInfo = {
   nextOccurrenceKey: string;
   speedKmh: number;
 };
+
+export function createReversedSchedule(
+  service: Service,
+  sourceRoute: CompiledRoute | undefined,
+  reversedRoute: CompiledRoute,
+) {
+  const timings: Service["timings"] = {};
+  if (!sourceRoute?.valid || !reversedRoute.valid || sourceRoute.stations.length !== reversedRoute.stations.length) {
+    return timings;
+  }
+  const duration = buildAnchors(service, sourceRoute).at(-1)?.time ?? 0;
+  reversedRoute.stations.forEach((station, index) => {
+    const sourceStation = sourceRoute.stations[sourceRoute.stations.length - 1 - index];
+    const rule = service.timings[sourceStation.occurrenceKey];
+    const platform = reversePlatform(timingPlatform(rule));
+    if (!rule || rule.mode === "pass-flexible") {
+      timings[station.occurrenceKey] = { mode: "pass-flexible", platform };
+    } else if (rule.mode === "pass-exact") {
+      timings[station.occurrenceKey] = { ...rule, platform, pass: duration - rule.pass };
+    } else {
+      timings[station.occurrenceKey] = {
+        mode: "stop",
+        platform: platform ?? "2",
+        arrival: duration - rule.departure,
+        departure: duration - rule.arrival,
+      };
+    }
+  });
+  return timings;
+}
 
 export function resolveStationTimes(service: Service, route: CompiledRoute) {
   const anchors = buildAnchors(service, route);
@@ -89,19 +120,20 @@ export function createUniformSchedule(
       ? 0
       : Math.round(currentDeparture + (station.distance - previous.distance) / metresPerSecond);
     const previousRule = service.timings[station.occurrenceKey];
+    const platform = timingPlatform(previousRule);
     const mode = isFirst || isLast || !preservePassRules
       ? "stop"
       : previousRule?.mode ?? "stop";
 
     if (mode === "pass-flexible") {
-      timings[station.occurrenceKey] = { mode };
+      timings[station.occurrenceKey] = { mode, platform };
       currentDeparture = arrival;
     } else if (mode === "pass-exact") {
-      timings[station.occurrenceKey] = { mode, pass: arrival };
+      timings[station.occurrenceKey] = { mode, platform, pass: arrival };
       currentDeparture = arrival;
     } else {
       const departure = arrival + (isFirst || isLast ? 0 : Math.max(0, dwellSeconds));
-      timings[station.occurrenceKey] = { mode, arrival, departure };
+      timings[station.occurrenceKey] = { mode, platform: platform ?? "1", arrival, departure };
       currentDeparture = departure;
     }
   });

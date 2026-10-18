@@ -21,9 +21,9 @@ export type RouteLeg = {
 };
 
 export type TimingRule =
-  | { mode: "stop"; arrival: number; departure: number }
-  | { mode: "pass-exact"; pass: number }
-  | { mode: "pass-flexible" };
+  | { mode: "stop"; platform: string; arrival: number; departure: number }
+  | { mode: "pass-exact"; platform: string | null; pass: number }
+  | { mode: "pass-flexible"; platform: string | null };
 
 export type Service = {
   id: string;
