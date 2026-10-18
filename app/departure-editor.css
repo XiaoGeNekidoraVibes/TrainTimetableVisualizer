@@ -1,0 +1,72 @@
+.departure-plan-summary { margin: 3px 0 17px; padding-top: 15px; border-top: 1px solid var(--line); }
+.departure-plan-summary > div { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.departure-plan-summary strong { font-size: 11px; font-weight: 600; }
+.departure-plan-summary > div > span { color: var(--teal); font-size: 10px; }
+.departure-plan-summary > button { width: 100%; display: flex; justify-content: space-between; padding: 11px 12px; border: 1px solid rgba(237,157,93,.4); border-radius: 3px; color: var(--accent-soft); background: rgba(237,157,93,.06); text-align: left; font-size: 11px; cursor: pointer; }
+.departure-plan-summary > button:hover { border-color: var(--accent); background: rgba(237,157,93,.1); }
+.departure-plan-summary > p { margin: 8px 0 0; color: var(--muted); font-size: 9px; line-height: 1.6; }
+
+.departure-range-dialog { position: fixed; inset: 0; width: min(1080px, calc(100vw - 48px)); max-width: none; height: min(730px, calc(100dvh - 48px)); max-height: none; margin: auto; padding: 0; overflow: hidden; border: 1px solid #465048; border-top: 3px solid var(--accent); border-radius: 5px; color: var(--text); background: #1b201d; box-shadow: 0 24px 100px #0009; color-scheme: dark; }
+.departure-range-dialog::backdrop { background: rgba(6,10,8,.76); backdrop-filter: blur(3px); }
+.departure-range-dialog > form { height: 100%; display: flex; flex-direction: column; }
+.departure-range-dialog button { cursor: pointer; }
+.departure-range-dialog button:focus-visible, .departure-range-dialog textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.departure-range-dialog button:disabled { opacity: .4; cursor: default; }
+.range-dialog-heading { display: flex; flex: none; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 23px 28px 19px; border-bottom: 1px solid var(--line); }
+.range-dialog-heading h2 { margin: 9px 0 6px; font-size: 22px; font-weight: 600; letter-spacing: .01em; }
+.range-dialog-heading p { margin: 0; color: var(--muted); font-size: 12px; }
+.range-dialog-close { flex: none; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line-strong); border-radius: 3px; color: var(--muted); background: transparent; font-size: 23px; line-height: 1; }
+.range-dialog-close:hover { color: var(--text); border-color: var(--muted); }
+.range-dialog-body { min-height: 0; flex: 1; display: grid; grid-template-columns: 1fr 1fr; }
+.range-source-pane, .range-preview-pane { min-width: 0; min-height: 0; display: flex; flex-direction: column; padding: 23px 28px; }
+.range-source-pane { border-right: 1px solid var(--line); overflow-y: auto; }
+.range-preview-pane { background: #171c19; }
+.range-pane-heading { flex: none; min-height: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.range-pane-heading > label, .range-pane-heading h3 { margin: 0; color: #e0e7e1; font-size: 13px; font-weight: 600; }
+.range-pane-heading > button { border: 0; padding: 2px 0; color: var(--accent-soft); background: transparent; font-size: 11px; }
+.range-pane-heading > span { color: var(--muted); font-size: 11px; }
+.range-format-key { flex: none; display: flex; gap: 25px; padding: 8px 13px; border: 1px solid var(--line-strong); border-bottom: 0; color: #adb8b0; background: #28302a; font-size: 10px; }
+.range-source-pane textarea { display: block; width: 100%; flex: 1 0 180px; min-height: 180px; padding: 12px 13px; border: 1px solid var(--line-strong); border-radius: 0; color: #f1c697; background: #111713; font-family: var(--font-geist-mono), Consolas, monospace; font-size: 13px; line-height: 2.1; tab-size: 2; resize: none; scrollbar-width: thin; }
+.range-source-pane textarea::placeholder { color: #66736b; opacity: 1; }
+.range-source-pane textarea[aria-invalid="true"] { border-color: var(--danger); }
+.range-format-help { flex: none; margin-top: 10px; }
+.range-format-help p { margin: 5px 0; color: #929f96; font-size: 11px; line-height: 1.7; }
+.range-input-errors { flex: none; margin: 12px 0 0; padding: 10px 12px; border-left: 2px solid var(--danger); color: #eeb0a9; background: rgba(223,118,111,.07); list-style: none; font-size: 11px; line-height: 1.6; }
+.range-input-errors li + li { margin-top: 8px; }
+.range-input-errors strong { display: block; margin-bottom: 2px; color: #f2cbc6; font-weight: 600; }
+.range-preview-totals { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; padding-bottom: 14px; border-bottom: 1px solid var(--line); }
+.range-preview-totals > span { color: var(--muted); font-size: 11px; }
+.range-preview-totals strong { display: block; margin-top: 5px; color: #e1e9e3; font-family: var(--font-geist-mono), Consolas, monospace; font-size: 25px; font-weight: 500; }
+.range-preview-totals > span:last-child strong { color: var(--teal); }
+.range-summary-scroll { flex: none; max-height: 145px; overflow: auto; margin-bottom: 13px; scrollbar-width: thin; }
+.range-summary-table { width: 100%; border-collapse: collapse; white-space: nowrap; text-align: left; font-variant-numeric: tabular-nums; }
+.range-summary-table th { position: sticky; top: 0; padding: 0 8px 8px 0; color: #a1aea5; background: #171c19; font-size: 10px; font-weight: 400; }
+.range-summary-table td { padding: 8px 8px 8px 0; border-top: 1px solid var(--line); color: #d9e2db; font-family: var(--font-geist-mono), Consolas, monospace; font-size: 10px; }
+.range-summary-table td:first-child, .range-summary-table td span { color: #7b8a80; }
+.range-summary-table th:last-child, .range-summary-table td:last-child { padding-right: 0; text-align: right; }
+.range-dedup-note { flex: none; margin: 0 0 10px; color: var(--accent-soft); font-size: 10px; }
+.range-departure-list { min-height: 85px; flex: 1; overflow-y: auto; align-content: start; display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); column-gap: 14px; scrollbar-width: thin; }
+.range-departure-list > div { display: flex; align-items: center; gap: 9px; min-height: 30px; border-bottom: 1px solid rgba(230,237,228,.06); font-family: var(--font-geist-mono), Consolas, monospace; }
+.range-departure-list > div > span { color: #718077; font-size: 9px; }
+.range-departure-list time { color: #d1e2d6; font-size: 11px; }
+.range-preview-empty { grid-column: 1 / -1; margin: 0; padding: 28px 0; color: var(--muted); font-size: 12px; line-height: 1.8; }
+.range-preview-pagination { flex: none; display: flex; align-items: center; justify-content: space-between; margin-top: 13px; color: var(--muted); font-size: 11px; }
+.range-preview-pagination button { padding: 5px 9px; border: 1px solid var(--line-strong); border-radius: 2px; color: var(--muted); background: transparent; font-size: 11px; }
+.range-dialog-footer { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px 28px; border-top: 1px solid var(--line); background: #202723; }
+.range-dialog-footer p { max-width: 480px; margin: 0; color: #a4b0a8; font-size: 11px; line-height: 1.7; }
+.range-dialog-footer > div { flex: none; display: flex; gap: 9px; }
+.range-dialog-footer button { padding: 10px 15px; border: 1px solid var(--line-strong); border-radius: 3px; color: #c0cbc3; background: transparent; font-size: 12px; }
+.range-dialog-footer button.range-apply-button { border-color: var(--accent); color: #271a10; background: var(--accent); font-weight: 600; }
+
+@media (max-width: 760px) {
+  .departure-range-dialog { width: calc(100vw - 24px); height: calc(100dvh - 24px); }
+  .range-dialog-heading { padding: 18px; }
+  .range-dialog-heading h2 { font-size: 19px; }
+  .range-dialog-body { display: block; overflow-y: auto; }
+  .range-source-pane, .range-preview-pane { padding: 18px; overflow: visible; }
+  .range-source-pane { border-right: 0; border-bottom: 1px solid var(--line); }
+  .range-source-pane textarea { flex: none; height: 200px; }
+  .range-departure-list { max-height: 250px; }
+  .range-dialog-footer { flex-wrap: wrap; gap: 12px; padding: 14px 18px; }
+  .range-dialog-footer > div { margin-left: auto; }
+}

@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { getStationBoardEvents, getStationTimetable } from "../domain/stationBoard";
 import { getStationPlatforms, matchesPlatforms, platformLabel } from "../domain/platform";
 import type { CompiledRoute, RailLine, Service, Station } from "../domain/types";
 import { formatDuration, formatTime } from "../lib/time";
+import { DisplayMarquee } from "./DisplayMarquee";
 
 type StationDisplayProps = {
   initialStationId: string;
@@ -56,12 +57,12 @@ export function StationDisplay({
   const [fields, setFields] = useState<Record<FieldKey, boolean>>({
     category: true,
     trainId: true,
-    origin: true,
+    origin: false,
     destination: true,
     platform: true,
-    arrival: true,
+    arrival: false,
     departure: true,
-    countdown: true,
+    countdown: false,
     stops: true,
   });
 
@@ -90,6 +91,19 @@ export function StationDisplay({
     && filterByLines(event.lineIds, selectedLineIds)
     && matchesPlatforms(event.platform, selectedPlatforms),
   );
+  const boardPageCount = Math.max(1, Math.ceil(filteredBoardEvents.length / 6));
+  const boardContext = JSON.stringify([stationId, selectedLineIds, selectedPlatforms, showPassing, filteredBoardEvents[0]?.key, filteredBoardEvents[0]?.status]);
+  const [boardPage, setBoardPage] = useState({ context: boardContext, index: 0 });
+  const boardPageIndex = boardPage.context === boardContext ? boardPage.index % boardPageCount : 0;
+  const visibleBoardEvents = filteredBoardEvents.slice(boardPageIndex * 6, (boardPageIndex + 1) * 6);
+  useEffect(() => {
+    if (view !== "board" || boardPageCount <= 1) return;
+    const timer = window.setInterval(() => {
+      setBoardPage((current) => ({ context: boardContext, index: current.context === boardContext ? current.index + 1 : 1 }));
+    }, 12000);
+    return () => window.clearInterval(timer);
+  }, [boardContext, boardPageCount, view]);
+
   const timetableDestinations = Array.from(new Set(filteredTimetable.map((event) => event.destination)));
   const showDestinationMarks = timetableDestinations.length > 1;
   const destinationMark = (destination: string) => (
@@ -134,7 +148,7 @@ export function StationDisplay({
     <div className="station-display-layer" onMouseDown={(event) => {
       if (event.target === event.currentTarget) onClose();
     }}>
-    <div className="station-display" role="dialog" aria-modal="true" aria-label={`${station?.name ?? "车站"}看板`}>
+    <div className={`station-display ${view === "board" ? "is-board" : ""}`} role="dialog" aria-modal="true" aria-label={`${station?.name ?? "车站"}看板`}>
       <header className="station-display-header">
         <div className="station-display-brand">
           <span className="display-live-dot" />
@@ -181,51 +195,67 @@ export function StationDisplay({
 
       {view === "board" ? (
         <div className="departure-board-view">
-          <div className="board-title-row">
-            <div><span>LIVE DEPARTURES</span><h1>{station?.name} · 列车动态</h1></div>
+          <div className="board-controls">
+            {platformFilters}
+            <details className="board-field-menu">
+              <summary>显示项目 <span aria-hidden="true">＋</span></summary>
             <div className="field-toggles">
-              <span>显示项目</span>
               {(Object.keys(FIELD_LABELS) as FieldKey[]).map((key) => (
                 <label key={key}><input type="checkbox" checked={fields[key]} onChange={(event) => setFields({ ...fields, [key]: event.target.checked })} />{FIELD_LABELS[key]}</label>
               ))}
             </div>
+            </details>
           </div>
-          {platformFilters}
+          <section className="board-housing" aria-label="列车出发电子显示屏">
+            <div className="board-fascia">
+              <svg className="board-rail-symbol" viewBox="0 0 40 48" fill="none" aria-hidden="true">
+                <rect x="7" y="3" width="26" height="32" rx="5" stroke="currentColor" strokeWidth="3" />
+                <path d="M8 23h24M20 4v18M10 45l7-10m13 10-7-10M11 41h18" stroke="currentColor" strokeWidth="3" />
+                <path d="M12 29h4m8 0h4" stroke="currentColor" strokeWidth="3" />
+              </svg>
+              <div className="board-station-name"><h1>{station?.name ?? "车站"}</h1><span>列车出发案内</span></div>
+              <div className="board-heading"><strong>列车出发</strong><span>DEPARTURES</span></div>
+              <div className="board-screen-clock"><span>现在时刻 <small>CURRENT TIME</small></span><strong>{formatTime(clockSeconds, false)}<small>:{formatTime(clockSeconds).slice(-2)}</small></strong></div>
+            </div>
           <div className="departure-board-table-wrap">
             <table className="departure-board-table">
               <thead><tr>
-                <th className="status-column">状态</th>
-                {fields.category && <th>种别</th>}
-                {fields.trainId && <th>车次</th>}
-                {fields.origin && <th>始发站</th>}
-                {fields.destination && <th>终到站</th>}
+                {fields.category && <th>种别<small>SERVICE</small></th>}
+                {fields.trainId && <th>车次<small>TRAIN</small></th>}
+                {fields.departure && <th>发车时间<small>DEPARTURE</small></th>}
+                {fields.origin && <th>始发站<small>FROM</small></th>}
+                {fields.destination && <th>终到站<small>DESTINATION</small></th>}
                 {fields.platform && <th>站台</th>}
-                {fields.arrival && <th>到达时间</th>}
-                {fields.departure && <th>发车时间</th>}
-                {fields.countdown && <th>距离下一节点</th>}
-                {fields.stops && <th className="stops-column">停车站</th>}
+                <th className="status-column">状态<small>STATUS</small></th>
+                {fields.arrival && <th>到达时间<small>ARRIVAL</small></th>}
+                {fields.countdown && <th>动态时间<small>REMAINING</small></th>}
+                {fields.stops && <th className="stops-column">停车站<small>STOPS AT</small></th>}
               </tr></thead>
-              <tbody>
-                {filteredBoardEvents.map((event) => (
+              <tbody key={`${boardContext}:${boardPageIndex}`}>
+                {visibleBoardEvents.map((event) => (
                   <tr key={event.key} style={{ "--service-color": event.color } as CSSProperties}>
-                    <td><span className={`board-status ${event.status}`}>
-                      {event.status === "dwelling" ? "停泊中" : event.status === "passing" ? "通过" : "即将到达"}
-                    </span></td>
                     {fields.category && <td><strong className="category-chip">{event.category}</strong></td>}
                     {fields.trainId && <td><strong className="board-train-id">{event.trainId}</strong></td>}
+                    {fields.departure && <td className="board-time" title={event.departure === undefined ? undefined : formatTime(event.departure)}>{event.departure === undefined ? "—" : formatTime(event.departure, false)}</td>}
                     {fields.origin && <td>{event.origin}</td>}
-                    {fields.destination && <td>{event.destination}</td>}
+                    {fields.destination && <td className="board-destination"><span>{event.destination}</span></td>}
                     {fields.platform && <td className="board-platform">{event.platform ?? "无站台"}</td>}
+                    <td><span className={`board-status ${event.status} ${event.countdown <= 60 ? "is-imminent" : ""}`}>
+                      {event.status === "dwelling" ? "停靠中" : event.status === "passing" ? "通过" : event.countdown <= 60 ? "即将到达" : "候车"}
+                    </span></td>
                     {fields.arrival && <td className="board-time">{event.arrival === undefined ? "通过" : formatTime(event.arrival)}</td>}
-                    {fields.departure && <td className="board-time">{event.departure === undefined ? "—" : formatTime(event.departure)}</td>}
                     {fields.countdown && <td><div className="countdown-cell"><span>{event.status === "dwelling" ? "距发车" : event.status === "passing" ? "距通过" : "距到达"}</span><strong>{formatDuration(event.countdown)}</strong></div></td>}
-                    {fields.stops && <td><div className="stops-marquee"><span>{event.stoppingStations.join("　→　") || "不停站"}</span></div></td>}
+                    {fields.stops && <td><DisplayMarquee className="board-stops" text={event.stoppingStations.join("　·　") || (event.destination === station?.name ? "终点站" : "不停站")} /></td>}
                   </tr>
                 ))}
+                {visibleBoardEvents.length > 0 && Array.from({ length: 6 - visibleBoardEvents.length }, (_, index) => <tr key={`blank-${index}`} className="board-blank-row" aria-hidden="true"><td colSpan={1 + Object.values(fields).filter(Boolean).length} /></tr>)}
               </tbody>
             </table>
             {!filteredBoardEvents.length && <div className="display-empty">未来两小时没有符合筛选条件的列车</div>}
           </div>
+            <footer className="board-information-strip"><strong>乘车提示<span>INFORMATION</span></strong><DisplayMarquee text="请按所示站台候车，列车到站后请先下后上。　Please wait at the indicated platform. Let passengers alight first." /><span className="board-page-counter" aria-label={`第 ${boardPageIndex + 1} 页，共 ${boardPageCount} 页`}>{boardPageIndex + 1}<small> / {boardPageCount}</small></span></footer>
+            <div className="board-equipment-label" aria-hidden="true"><span>旅客信息显示系统 / PASSENGER INFORMATION</span><span>RAIL FLOW</span></div>
+          </section>
         </div>
       ) : (
         <div className="japanese-timetable-view">

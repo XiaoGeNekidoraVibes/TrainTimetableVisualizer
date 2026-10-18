@@ -13,11 +13,10 @@ import type {
 import { validateSchedule } from "../domain/simulation";
 import { createUniformSchedule, getTimingIntervals } from "../domain/schedule";
 import { timingPlatform } from "../domain/platform";
+import { getIndividualDepartures, setDepartureRanges, setIndividualDepartures } from "../domain/departures";
+import { DepartureRangeEditor } from "./DepartureRangeEditor";
 import {
-  createDepartureRange,
   formatDuration,
-  formatTime,
-  parseClock,
   parseDepartureList,
   parseDuration,
 } from "../lib/time";
@@ -71,12 +70,9 @@ export function ServiceEditor({
   onDuplicate,
 }: ServiceEditorProps) {
   const [departureText, setDepartureText] = useState(
-    service.departures.map((time) => formatTime(time)).join(", "),
+    getIndividualDepartures(service).map((time) => formatDuration(time)).join(", "),
   );
-  const [rangeStart, setRangeStart] = useState("06:00:00");
-  const [rangeEnd, setRangeEnd] = useState("23:00:00");
-  const [rangeInterval, setRangeInterval] = useState("00:30:00");
-  const [rangeError, setRangeError] = useState<string | null>(null);
+  const [showRangeEditor, setShowRangeEditor] = useState(false);
   const [quickSpeed, setQuickSpeed] = useState("80");
   const [quickDwell, setQuickDwell] = useState("00:01:00");
   const [preservePassRules, setPreservePassRules] = useState(true);
@@ -123,23 +119,6 @@ export function ServiceEditor({
 
   const setTiming = (key: string, timing: TimingRule) => {
     onChange({ ...service, timings: { ...service.timings, [key]: timing } });
-  };
-
-  const addDepartureRange = () => {
-    const start = parseClock(rangeStart);
-    const end = parseClock(rangeEnd);
-    const interval = parseDuration(rangeInterval);
-    if (start === null || end === null || interval === null || interval <= 0 || end < start) {
-      setRangeError("请检查开始、结束和间隔时间；结束时间不能早于开始时间");
-      return;
-    }
-    const departures = Array.from(new Set([
-      ...service.departures,
-      ...createDepartureRange(start, end, interval),
-    ])).sort((a, b) => a - b);
-    onChange({ ...service, departures });
-    setDepartureText(departures.map((time) => formatTime(time)).join(", "));
-    setRangeError(null);
   };
 
   const applyUniformSchedule = () => {
@@ -227,41 +206,44 @@ export function ServiceEditor({
           />
           <small>在花括号中使用 n，例如 G&#123;100+n*2&#125;</small>
         </label>
+        <div className="departure-plan-summary">
+          <div><strong>发车计划</strong><span>{service.departures.length} 个班次</span></div>
+          <button type="button" onClick={() => setShowRangeEditor(true)}>
+            <span>{service.departurePlan ? "编辑时间范围" : "按时间范围批量添加"}</span><span aria-hidden="true">↗</span>
+          </button>
+          <p>{service.departurePlan ? `已保存 ${service.departurePlan.rangeText.split(/\r?\n/).filter((line) => line.trim()).length} 个范围，可打开面板修改并预览。` : "每行输入首班、末班上限和间隔，打开面板批量编排。"}</p>
+        </div>
         <label>
-          <span>当日发车时间</span>
+          <span>单独发车时间</span>
           <textarea
+            aria-label="单独发车时间"
+            className="mono-input"
             rows={2}
             value={departureText}
             onChange={(event) => setDepartureText(event.target.value)}
             onBlur={() => {
               const departures = parseDepartureList(departureText);
-              onChange({ ...service, departures });
-              setDepartureText(departures.map((time) => formatTime(time)).join(", "));
+              const next = setIndividualDepartures(service, departures);
+              onChange(next);
+              setDepartureText(getIndividualDepartures(next).map((time) => formatDuration(time)).join(", "));
             }}
           />
-          <small>用逗号或空格分隔，精确到秒</small>
+          <small>用逗号或空格分隔；与范围班次合并，重叠时刻只发一班。</small>
         </label>
-        <div className="departure-generator">
-          <div className="departure-generator-title">
-            <strong>按时间范围批量添加</strong>
-            <span>包含结束时刻</span>
-          </div>
-          <div className="departure-range-grid">
-            <label><span>开始</span><input type="time" step={1} value={rangeStart} onChange={(event) => setRangeStart(event.target.value)} /></label>
-            <label><span>结束</span><input type="time" step={1} value={rangeEnd} onChange={(event) => setRangeEnd(event.target.value)} /></label>
-            <label><span>间隔</span><input type="text" inputMode="numeric" value={rangeInterval} onChange={(event) => setRangeInterval(event.target.value)} placeholder="00:30:00" /></label>
-          </div>
-          <div className="departure-generator-actions">
-            <button type="button" onClick={addDepartureRange}>＋ 添加班次</button>
-            <button type="button" className="secondary" onClick={() => {
-              onChange({ ...service, departures: [] });
-              setDepartureText("");
-              setRangeError(null);
-            }}>清空</button>
-          </div>
-          {rangeError && <p className="range-error">{rangeError}</p>}
-        </div>
       </section>
+
+      {showRangeEditor && <DepartureRangeEditor
+        serviceName={service.name}
+        initialText={service.departurePlan?.rangeText ?? ""}
+        individualDepartures={getIndividualDepartures(service)}
+        onApply={(text) => {
+          const next = setDepartureRanges(service, text);
+          if (!next) return;
+          onChange(next);
+          setShowRangeEditor(false);
+        }}
+        onClose={() => setShowRangeEditor(false)}
+      />}
 
       <section className="form-section">
         <div className="section-title-row">

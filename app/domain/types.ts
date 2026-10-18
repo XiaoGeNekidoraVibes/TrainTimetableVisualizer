@@ -33,6 +33,10 @@ export type Service = {
   category: string;
   idFormula: string;
   departures: number[];
+  departurePlan?: {
+    rangeText: string;
+    individualDepartures: number[];
+  };
   routeLegs: RouteLeg[];
   timings: Record<string, TimingRule>;
   color: string;

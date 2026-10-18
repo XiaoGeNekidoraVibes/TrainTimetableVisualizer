@@ -1,9 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { resolveStationTimes, serviceLineIdsAtStation } from "../domain/schedule";
+import { buildPidRoutePages } from "../domain/trainPid";
+import type { PidPassGroup } from "../domain/trainPid";
 import type { CompiledRoute, RailLine, Service, Station } from "../domain/types";
+import { DisplayMarquee } from "./DisplayMarquee";
 
 type TrainPidProps = {
   trainId: string;
@@ -56,11 +59,6 @@ export function TrainPid({
     const transfers = focusStation
       ? lines.filter((line) => line.stationIds.includes(focusStation.stationId) && !usedLineIds.has(line.id))
       : [];
-    const visibleStations = route.stations
-      .map((station, index) => ({ station, index }))
-      .filter(({ index }) => resolved[index].departure >= relativeTime);
-    const focusVisibleIndex = Math.max(0, visibleStations.findIndex(({ index }) => index === focusIndex));
-
     return {
       relativeTime,
       resolved,
@@ -71,10 +69,43 @@ export function TrainPid({
       destination: stationMap.get(route.stations.at(-1)?.stationId ?? "")?.name ?? "未知终点",
       transfers,
       stationMap,
-      visibleStations,
-      focusVisibleIndex,
     };
   }, [clockSeconds, departureIndex, lines, route, service, stations]);
+
+  const screenRef = useRef<HTMLElement>(null);
+  const [capacity, setCapacity] = useState(8);
+  useEffect(() => {
+    const screen = screenRef.current;
+    if (!screen) return;
+    const measure = () => setCapacity(Math.max(4, Math.min(8, Math.floor(screen.clientWidth / 92))));
+    const observer = new ResizeObserver(measure);
+    observer.observe(screen);
+    measure();
+    return () => observer.disconnect();
+  }, []);
+  const pages = useMemo(() => buildPidRoutePages(service, route, model.focusIndex, capacity), [service, route, model.focusIndex, capacity]);
+  const pageCount = pages.length;
+  const focusKey = `${service.id}:${departureIndex}:${model.focusIndex}:${model.currentIndex >= 0 ? "stopped" : "moving"}`;
+  const [routePage, setRoutePage] = useState({ focusKey, index: 0 });
+  if (routePage.focusKey !== focusKey) setRoutePage({ focusKey, index: 0 });
+  const pageIndex = routePage.focusKey === focusKey ? routePage.index % Math.max(1, pageCount) : 0;
+  const pageContext = `${focusKey}:${pageIndex}:${capacity}`;
+  const [expandedGroup, setExpandedGroup] = useState<{ context: string; group: PidPassGroup } | null>(null);
+  const routePageModel = pages[pageIndex];
+  const routeItems = routePageModel?.items ?? [];
+  const activeGroup = expandedGroup?.context === pageContext && routeItems.includes(expandedGroup.group) ? expandedGroup.group : null;
+  if (expandedGroup && !activeGroup) setExpandedGroup(null);
+  // Allow a complete vertical marquee cycle before advancing to another route page.
+  const pageHoldMs = Math.max(8000, ...routeItems.map((item) => item.kind === "station"
+    ? ((Array.from(model.stationMap.get(item.station.stationId)?.name ?? "").length * 24 + 24) / 20 + 2) * 1000
+    : 0));
+  useEffect(() => {
+    if (pageCount <= 1 || activeGroup) return;
+    const timer = window.setTimeout(() => {
+      setRoutePage((current) => ({ focusKey, index: current.focusKey === focusKey ? current.index + 1 : 1 }));
+    }, pageHoldMs);
+    return () => window.clearTimeout(timer);
+  }, [focusKey, pageCount, pageIndex, pageHoldMs, activeGroup]);
 
   if (!route.valid || !route.stations.length) return null;
   const etaSeconds = model.nextIndex < 0
@@ -82,71 +113,88 @@ export function TrainPid({
     : Math.max(0, model.resolved[model.nextIndex].arrival - model.relativeTime);
   const etaMinutes = Math.ceil(etaSeconds / 60);
   const isDwelling = model.currentIndex >= 0;
+  const isFinished = model.nextIndex < 0 && !isDwelling;
+  const focusPlatform = service.timings[route.stations[model.focusIndex].occurrenceKey]?.platform;
+  const stationName = (stationId: string) => model.stationMap.get(stationId)?.name ?? "已删除";
 
   return (
     <aside
       className="train-pid"
-      style={{ "--pid-color": service.color } as CSSProperties}
+      ref={screenRef}
+      style={{
+        "--pid-color": service.color,
+        "--pid-name-size": `${Math.max(22, Math.min(52, 340 / Math.max(1, Array.from(model.focusName).length)))}px`,
+        "--pid-category-size": `${Math.max(14, Math.min(22, 84 / Math.max(1, Array.from(service.category || "普通").length)))}px`,
+      } as CSSProperties}
       aria-label={`${trainId} 车内旅客信息显示器`}
     >
-      <header className="pid-header">
-        <div className="pid-service-block">
-          <span className="pid-category">{service.category || "普通"}</span>
-          <strong>{trainId}</strong>
-          <small>{service.name}</small>
-        </div>
-        <div className="pid-destination">
-          <span>开往 · DESTINATION</span>
-          <strong>{model.destination}</strong>
-        </div>
+      <div className="pid-bezel-label"><span>车内案内 <small>PASSENGER INFORMATION</small></span>
         <button type="button" onClick={onClose} aria-label="关闭列车 LCD">×</button>
-      </header>
-
-      {isDwelling ? (
-        <div className="pid-arrival-state">
-          <span>现在停靠 · NOW STOPPING</span>
-          <strong>{model.focusName}</strong>
-          <p>{model.transfers.length
-            ? <>换乘 {model.transfers.map((line) => line.name).join(" · ")}</>
-            : "请从右侧车门下车"}</p>
+      </div>
+      <div className="pid-screen">
+        <header className="pid-header">
+          <div className="pid-service-block"><strong className="pid-category"><DisplayMarquee text={service.category || "普通"} /></strong><DisplayMarquee className="pid-service-name" text={service.name} /></div>
+          <div className="pid-destination"><span>开往 <small>FOR</small></span><strong title={model.destination}><DisplayMarquee text={model.destination} /></strong></div>
+          <div className="pid-train-number"><small>车次 / TRAIN</small><strong><DisplayMarquee text={trainId} /></strong></div>
+        </header>
+        <div className={`pid-next-row ${isDwelling ? "is-dwelling" : ""}`}>
+          <div className="pid-next-label"><span>{isDwelling ? "现在停靠" : isFinished ? "终点站" : etaSeconds <= 45 ? "即将到达" : "下一站"}</span><small>{isDwelling ? "NOW AT" : isFinished ? "TERMINUS" : etaSeconds <= 45 ? "ARRIVING" : "NEXT"}</small></div>
+          <strong className="pid-focus-name" key={model.focusName} title={model.focusName}><DisplayMarquee text={model.focusName} /></strong>
+          <div className="pid-eta">{isDwelling ? <><strong><DisplayMarquee text={focusPlatform ?? "—"} /></strong><span>站台 / PLATFORM</span></> : isFinished ? <span>运行结束<br />END OF SERVICE</span> : <><span>约 <strong>{etaMinutes < 1 ? "即将" : etaMinutes}</strong>{etaMinutes >= 1 && " 分"}</span><small>{etaMinutes < 1 ? "ARRIVING SOON" : "min to arrival"}</small></>}</div>
         </div>
-      ) : (
-        <>
-          <div className="pid-next-row">
-            <div><span>下一站 · NEXT</span><strong>{model.focusName}</strong></div>
-            <div className="pid-transfer-list">
-              <span>换乘</span>
-              {model.transfers.length ? model.transfers.map((line) => (
-                <i key={line.id} style={{ "--transfer-color": line.color } as CSSProperties}>{line.name}</i>
-              )) : <small>无换乘线路</small>}
-            </div>
-            <div className="pid-eta"><strong>{etaMinutes}</strong><span>分钟后到达</span></div>
+        <div className="pid-map-caption">
+          <div className="pid-route-legend"><span><i className="legend-stop" />停靠</span><span><i className="legend-pass" />通过</span></div>
+          <div className="pid-page-controls">
+            {pageCount > 1 && <><button type="button" aria-label="上一页沿途站点" onClick={() => setRoutePage({ focusKey, index: (pageIndex + pageCount - 1) % pageCount })}>‹</button><span aria-live="polite">{pageIndex + 1} / {pageCount}</span><button type="button" aria-label="下一页沿途站点" onClick={() => setRoutePage({ focusKey, index: (pageIndex + 1) % pageCount })}>›</button></>}
+            <span>{isFinished ? "已到终点" : routePageModel?.continued ? "后续线路 →" : "运行方向 →"}</span>
           </div>
-          <div className="pid-route-window" key={model.focusIndex}>
-            <div
-              className={`pid-route-track ${model.visibleStations.length > 6 ? "is-long" : ""}`}
-              style={{ "--pid-focus-offset": `${model.focusVisibleIndex * 96 + 48}px` } as CSSProperties}
-            >
-              {model.visibleStations.map(({ station, index }) => {
-                const rule = service.timings[station.occurrenceKey];
-                const isPass = rule?.mode === "pass-exact" || rule?.mode === "pass-flexible";
+        </div>
+        <div className="pid-route-window">
+          <div className={`pid-route-track ${routePageModel?.gapAfterFocus ? "is-continuation" : ""}`} key={pageContext} style={{ "--pid-stop-count": Math.max(2, routeItems.length) } as CSSProperties}>
+              {routeItems.map((item) => {
+                if (item.kind === "pass-group") {
+                  const first = item.stations[0];
+                  const last = item.stations.at(-1)!;
+                  const passedCount = item.stations.filter(({ index }) => model.resolved[index].departure < model.relativeTime).length;
+                  return <div className={`pid-route-stop is-pass-group ${passedCount === item.stations.length ? "is-passed" : ""}`} key={`pass:${first.station.occurrenceKey}`}>
+                    <span className="pid-stop-minutes">通过 <b>{item.stations.length}</b> 站</span>
+                    <span className="pid-pass-segment" aria-hidden="true">〃</span>
+                    <button type="button" className="pid-pass-group-button" aria-label={`查看连续通过的 ${item.stations.length} 个车站`} aria-expanded={activeGroup === item} aria-controls={activeGroup === item ? "pid-pass-details" : undefined} onClick={() => setExpandedGroup(activeGroup === item ? null : { context: pageContext, group: item })}>
+                      <DisplayMarquee text={stationName(first.station.stationId)} />
+                      <span className="pid-pass-ellipsis" aria-hidden="true">⋮</span>
+                      <DisplayMarquee text={stationName(last.station.stationId)} />
+                      <small>{passedCount ? `已过 ${passedCount}/${item.stations.length}` : "展开站名"}</small>
+                    </button>
+                  </div>;
+                }
+                const { station, index, isPass } = item;
                 const upcomingMinutes = Math.max(0, Math.ceil((model.resolved[index].arrival - model.relativeTime) / 60));
+                const isPassed = model.resolved[index].departure < model.relativeTime;
+                const name = stationName(station.stationId);
                 return (
                   <div
-                    className={`pid-route-stop ${isPass ? "is-pass" : ""} ${index === model.focusIndex ? "is-next" : ""}`}
+                    className={`pid-route-stop ${isPass ? "is-pass" : ""} ${isPassed ? "is-passed" : ""} ${index === model.focusIndex && !isFinished ? "is-next" : ""}`}
                     key={station.occurrenceKey}
+                    data-occurrence={station.occurrenceKey}
+                    title={`${name} · ${isPass ? "通过" : "停靠"}${isPassed ? " · 已过" : ` · ${upcomingMinutes} 分钟`}`}
                   >
-                    <strong>{model.stationMap.get(station.stationId)?.name ?? "已删除"}</strong>
-                    <span className="pid-route-node">{!isPass && index >= model.focusIndex ? upcomingMinutes : ""}</span>
-                    <small>{isPass ? "通过" : index === model.focusIndex ? "下一站" : "停靠"}</small>
+                    <span className="pid-stop-minutes">{isPass ? isPassed ? "已过 · 通过" : "通过" : isPassed ? "已过" : isDwelling && index === model.focusIndex ? "停靠中" : <>{upcomingMinutes}<small>分</small></>}</span>
+                    <span className="pid-route-node" aria-hidden="true" />
+                    <strong className="pid-station-name" style={{ "--pid-station-font-size": `${Math.max(15, Math.min(21, 106 / (Array.from(name).length * 1.12)))}px` } as CSSProperties}><DisplayMarquee text={name} vertical /></strong>
+                    {index === route.stations.length - 1 && <small className="pid-terminus-label">终点</small>}
                   </div>
                 );
               })}
-            </div>
           </div>
-          <div className="pid-direction"><span>列车运行方向</span><b>→</b></div>
-        </>
-      )}
+          {activeGroup && <section className="pid-pass-details" id="pid-pass-details" aria-label="连续通过车站明细">
+            <header><strong>连续通过 {activeGroup.stations.length} 站</strong><button type="button" onClick={() => setExpandedGroup(null)}>收起 ×</button></header>
+            <ol>{activeGroup.stations.map(({ station, index }) => <li key={station.occurrenceKey} className={model.resolved[index].departure < model.relativeTime ? "is-passed" : ""}><span>{model.resolved[index].departure < model.relativeTime ? "已过" : "通过"}</span><strong>{stationName(station.stationId)}</strong></li>)}</ol>
+          </section>}
+        </div>
+        <footer className="pid-information-row">
+          {model.transfers.length ? <><strong>换乘<span>TRANSFER</span></strong><DisplayMarquee text={model.transfers.map((line) => line.name).join(" / ")}><span className="pid-transfer-list">{model.transfers.map((line) => <span key={line.id} style={{ "--transfer-color": line.color } as CSSProperties}>{line.name}</span>)}</span></DisplayMarquee></> : <><strong>乘车提示<span>INFORMATION</span></strong><DisplayMarquee text={isDwelling ? "请先下后上，注意站台间隙。　Please mind the gap between the train and the platform." : isFinished ? "本次列车运行结束。感谢您的乘坐。　Thank you for travelling with us." : "请留意车内广播，提前做好下车准备。　Please listen for announcements and prepare to alight."} /></>}
+        </footer>
+      </div>
     </aside>
   );
 }

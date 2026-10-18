@@ -1,0 +1,219 @@
+/* Google Fonts, self-hosted. See public/fonts/README.md for sources and licenses. */
+@font-face { font-family: "Rail UD"; src: url("/fonts/biz-udgothic-bold.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+@font-face { font-family: "Rail CJK"; src: url("/fonts/noto-sans-sc-semibold.woff2") format("woff2"); font-weight: 600; font-style: normal; font-display: swap; }
+@font-face { font-family: "Rail Dot"; src: url("/fonts/dotgothic16.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+
+.display-marquee { min-width: 0; overflow: hidden; white-space: nowrap; }
+.display-marquee-track { display: flex; width: max-content; gap: 48px; }
+.display-marquee-track > span { flex: none; }
+.display-marquee.is-scrolling .display-marquee-track { animation: rail-marquee var(--marquee-duration) linear infinite; }
+.display-marquee.is-vertical { height: 100%; }
+.display-marquee.is-vertical .display-marquee-track { width: 100%; flex-direction: column; align-items: center; gap: 24px; }
+.display-marquee.is-vertical .display-marquee-track > span { writing-mode: vertical-rl; }
+.display-marquee.is-vertical.is-scrolling .display-marquee-track { animation-name: rail-marquee-vertical; }
+@keyframes rail-marquee { to { transform: translateX(calc(-1 * var(--marquee-distance))); } }
+@keyframes rail-marquee-vertical { to { transform: translateY(calc(-1 * var(--marquee-distance))); } }
+@keyframes rail-indicator { 0%, 65% { opacity: 1; } 66%, 100% { opacity: .18; } }
+@keyframes rail-page-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Station departure board: a printed fascia above an illuminated matrix. */
+.station-display.is-board { border-radius: 3px; background: #15191a; backdrop-filter: none; grid-template-rows: 62px auto minmax(0,1fr); }
+.is-board .station-display-header { background: #202526; }
+.is-board .station-display-brand { gap: 10px; }
+.is-board .display-live-dot { width: 4px; height: 25px; border-radius: 0; box-shadow: none; background: #b1bbb6; }
+.is-board .station-display-brand strong { font-size: 13px; font-weight: 500; }
+.is-board .station-display-tabs { padding: 0; border: 0; border-radius: 0; background: transparent; align-self: stretch; }
+.is-board .station-display-tabs button { border-radius: 0; border-bottom: 3px solid transparent; }
+.is-board .station-display-tabs button.active { color: #ffe698; background: transparent; border-bottom-color: #ffe698; }
+.is-board .station-display-clock > span { font-size: 15px; color: #c2c8c4; }
+.is-board .station-display-clock button { width: 28px; height: 28px; border-radius: 0; }
+.is-board .station-display-toolbar { min-height: 52px; background: #191e1f; gap: 16px; }
+.is-board .display-line-filters button, .is-board .display-station-picker select { border-radius: 1px; }
+.is-board .display-line-filters button.active { border-color: #6c8076; }
+.is-board .departure-board-view { padding: 16px 22px 22px; }
+.is-board .board-controls { display: flex; align-items: start; gap: 12px; margin-bottom: 15px; }
+.is-board .station-platform-filter { flex: 1; margin: 0; padding: 0; border: 0; background: none; min-height: 29px; }
+.is-board .station-platform-filter button { border-radius: 1px; padding: 6px 10px; }
+.is-board .station-platform-filter button.active { border-color: #c7b779; color: #ffe698; }
+.board-field-menu { position: relative; z-index: 3; flex: none; color: #b5bdb9; font-size: 10px; }
+.board-field-menu summary { list-style: none; cursor: pointer; padding: 7px 11px; border: 1px solid #424a47; }
+.board-field-menu summary::-webkit-details-marker { display: none; }
+.board-field-menu summary > span { margin-left: 18px; }
+.board-field-menu[open] summary { color: #ffe698; }
+.is-board .field-toggles { position: absolute; right: 0; top: 35px; width: 240px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: #242b28; border: 1px solid #59635d; box-shadow: 0 5px 18px #0008; }
+.is-board .field-toggles label { font-size: 11px; color: #d0d7d1; }
+.board-housing { border: 7px solid #303638; border-bottom-width: 0; outline: 1px solid #64706b; background: #050909; box-shadow: 0 8px 18px #0006, inset 0 0 0 1px #000; }
+.board-fascia { display: grid; grid-template-columns: 44px minmax(0,1fr) auto auto; align-items: center; gap: 18px; padding: 19px 24px; color: #f1f3e9; background: #222b29; border-bottom: 5px solid #d5bc69; font-family: "Rail UD", "Rail CJK", sans-serif; font-weight: 700; }
+.board-rail-symbol { width: 37px; height: 45px; color: #eeeedd; }
+.board-station-name { min-width: 0; }
+.board-station-name h1 { margin: 0; font-size: clamp(23px,2.5vw,36px); line-height: 1.3; overflow-wrap: anywhere; }
+.board-station-name > span { display: block; margin-top: 6px; font-size: 11px; letter-spacing: .16em; color: #b7c0b6; }
+.board-heading { padding: 0 28px; border-left: 1px solid #52605a; }
+.board-heading strong { display: block; font-size: 24px; letter-spacing: .18em; }
+.board-heading > span { display: block; margin-top: 5px; font-family: Arial, sans-serif; font-size: 11px; letter-spacing: .21em; color: #ccd1c5; }
+.board-screen-clock { padding-left: 24px; border-left: 1px solid #52605a; }
+.board-screen-clock > span { display: block; color: #c5cbbf; font-size: 10px; }
+.board-screen-clock > span small { margin-left: 7px; font: 8px Arial,sans-serif; }
+.board-screen-clock > strong { display: block; margin-top: 3px; color: #fff2b3; font: 36px/1.2 "Rail Dot", monospace; font-variant-numeric: tabular-nums; }
+.board-screen-clock > strong small { font-size: 22px; }
+.is-board .departure-board-table-wrap { min-width: 0; overflow-x: auto; border: 0; background: #050909; }
+.is-board .departure-board-table { min-width: 1040px; font-family: "Rail CJK", "Rail UD", sans-serif; table-layout: auto; }
+.is-board .departure-board-table th { padding: 12px 14px 10px; font-size: 13px; font-weight: 600; letter-spacing: .05em; color: #dde2d9; background: #121a17; border: 0; border-bottom: 1px solid #65745d; white-space: nowrap; }
+.is-board .departure-board-table th small { display: block; margin-top: 4px; color: #99a393; font: 9px Arial,sans-serif; letter-spacing: .06em; }
+.is-board .departure-board-table td { height: 68px; padding: 10px 14px; border-bottom: 1px solid #344132; font-size: 18px; color: #d3e5bc; white-space: nowrap; }
+.is-board .departure-board-table tbody tr { box-shadow: none; background: #050909; animation: rail-page-in .25s ease-out; }
+.is-board .departure-board-table tbody tr:nth-child(even) { background: #0b100d; }
+.is-board .category-chip { display: inline-block; min-width: 56px; max-width: 140px; padding: 5px 8px; text-align: center; white-space: normal; border: 1px solid color-mix(in srgb,var(--service-color) 70%,#ddd); color: color-mix(in srgb,var(--service-color) 75%,#fff); font-size: 18px; font-weight: 600; line-height: 1.3; }
+.is-board .board-train-id { color: #e9f0d8; font: 24px/1.2 "Rail Dot",monospace; }
+.is-board .departure-board-table .board-time { font: 29px/1.15 "Rail Dot",monospace; color: #f4df95; font-variant-numeric: tabular-nums; }
+.is-board .departure-board-table .board-destination { min-width: 140px; color: #e5edcc; font-size: 28px; letter-spacing: .07em; }
+.is-board .board-destination > span { display: block; max-width: 260px; white-space: normal; overflow-wrap: anywhere; line-height: 1.35; }
+.is-board .departure-board-table .board-platform { color: #f4df95 !important; text-align: center; font: 30px/1.15 "Rail Dot","Rail CJK",sans-serif; }
+.is-board .board-status { padding: 0; border: 0; border-radius: 0; color: #d1dec0; background: transparent; font-size: 16px; }
+.is-board .board-status.dwelling { color: #93ec87; }
+.is-board .board-status.passing { color: #ff8c6a; }
+.is-board .board-status.is-imminent { animation: rail-indicator 1.6s steps(1,end) infinite; }
+.is-board .stops-column { min-width: 160px; }
+.board-stops { width: 190px; color: #b8c89d; font-size: 16px; }
+.is-board .countdown-cell span { color: #94a18a; font-size: 10px; }
+.is-board .countdown-cell strong { color: #e5d49e; font: 19px "Rail Dot",monospace; }
+.is-board .display-empty { padding: 85px 20px; font: 18px "Rail CJK",sans-serif; color: #bec8ab; }
+.board-information-strip { display: grid; grid-template-columns: 125px minmax(0,1fr) auto; align-items: center; gap: 20px; min-height: 62px; padding: 10px 20px; color: #eacb88; border-top: 2px solid #6c754f; font: 17px "Rail CJK",sans-serif; }
+.board-information-strip > strong { border-right: 1px solid #505943; color: #e3e7cc; font-size: 14px; font-weight: 600; }
+.board-information-strip > strong span { display: block; margin-top: 3px; font: 8px Arial,sans-serif; letter-spacing: .1em; }
+.board-page-counter { padding-left: 15px; border-left: 1px solid #505943; color: #c6ceaf; font: 23px "Rail Dot",monospace; }
+.board-page-counter small { font-size: 15px; }
+.board-equipment-label { display: flex; justify-content: space-between; gap: 12px; padding: 7px 12px; background: #303638; color: #abb4ae; font: 8px Arial,sans-serif; letter-spacing: .1em; }
+
+/* In-car LCD: opaque backlit panel, route ribbon, vertical station names. */
+.train-pid { --pid-color: #3d9988; position: absolute; z-index: 21; top: 16px; left: 50%; width: min(820px,calc(100% - 28px)); max-height: calc(100% - 32px); overflow-y: auto; scrollbar-width: thin; transform: translateX(-50%); padding: 0 8px 9px; border: 2px solid #707977; border-top-color: #bac0b8; border-radius: 3px; background: #282d2c; box-shadow: 0 12px 32px #0007; font-family: "Rail UD","Rail CJK",sans-serif; font-weight: 700; color: #1c2529; container-type: inline-size; }
+.pid-bezel-label { height: 25px; display: flex; justify-content: space-between; align-items: center; padding: 0 4px 0 7px; color: #c5cbc5; font: 9px Arial,"Microsoft YaHei",sans-serif; letter-spacing: .12em; }
+.pid-bezel-label small { margin-left: 10px; font-size: 7px; color: #8e9a93; }
+.pid-bezel-label button { width: 22px; height: 20px; padding: 0; border: 0; background: none; font: 19px Arial,sans-serif; color: #b9c1bc; cursor: pointer; }
+.pid-bezel-label button:hover { color: #fff; background: #4c5550; }
+.pid-screen { overflow: hidden; border: 1px solid #090f0e; background: #f5f5eb; }
+.pid-header { display: grid; grid-template-columns: 114px minmax(0,1fr) 100px; gap: 15px; align-items: center; padding: 10px 18px; height: 85px; border-bottom: 8px solid var(--pid-color); background: #e5e9dc; }
+.pid-service-block { min-width: 0; }
+.pid-category { display: block; padding: 4px 6px; border: 2px solid #48575a; color: #213f47; background: #f8f9ef; font-size: var(--pid-category-size); line-height: 1.2; text-align: center; }
+.pid-category .display-marquee:not(.is-scrolling) .display-marquee-track { margin-inline: auto; }
+.pid-service-name { margin-top: 5px; font-size: 9px; color: #4b5c58; line-height: 1.3; }
+.pid-destination { display: flex; gap: 10px; align-items: center; min-width: 0; }
+.pid-destination > span { white-space: nowrap; font-size: 12px; }
+.pid-destination > span small { margin-left: 3px; font-size: 9px; }
+.pid-destination > strong { flex: 1; min-width: 0; font-size: clamp(22px,4.3cqw,34px); line-height: 1.25; }
+.pid-train-number { min-width: 0; text-align: right; }
+.pid-train-number small { display: block; font: 8px Arial,sans-serif; letter-spacing: .03em; }
+.pid-train-number strong { display: block; margin-top: 5px; font: 700 22px Arial,sans-serif; }
+.pid-next-row { display: grid; grid-template-columns: 96px minmax(0,1fr) 108px; gap: 16px; height: 103px; align-items: center; padding: 13px 22px; border-bottom: 1px solid #b5c1b5; background: #fafbf2; }
+.pid-next-label { border-right: 2px solid #a2ada5; line-height: 1.5; color: #1a4e69; }
+.pid-next-label > span { display: block; font-size: 16px; }
+.pid-next-label > small { display: block; font: 700 16px Arial,sans-serif; letter-spacing: .05em; }
+.pid-focus-name { min-width: 0; font-size: min(var(--pid-name-size),7.2cqw); line-height: 1.3; letter-spacing: .06em; animation: rail-page-in .35s ease-out; }
+.pid-eta { min-width: 0; width: 100%; justify-self: end; text-align: center; color: #263a3e; }
+.pid-eta > span { display: block; font-size: 12px; line-height: 1.6; }
+.pid-eta strong { font: 700 34px/1 Arial,"Rail CJK",sans-serif; }
+.pid-eta > small { display: block; margin-top: 4px; font: 10px Arial,sans-serif; }
+.pid-eta > strong + span { margin-top: 5px; font-size: 9px; }
+.pid-eta > strong { display: block; }
+.pid-eta > strong .display-marquee:not(.is-scrolling) .display-marquee-track { margin-inline: auto; }
+.pid-next-row.is-dwelling .pid-next-label { color: #a12722; }
+.pid-map-caption { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 20px 0; min-height: 36px; font-size: 10px; color: #425956; }
+.pid-map-caption small { margin-left: 7px; font: 8px Arial,sans-serif; }
+.pid-route-legend, .pid-route-legend > span, .pid-page-controls { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.pid-route-legend { gap: 14px; }
+.pid-route-legend i { display: inline-block; width: 7px; height: 14px; border: 2px solid #2d4745; background: #fafbf0; }
+.pid-route-legend i.legend-pass { width: 7px; height: 7px; transform: rotate(45deg); border: 1px solid #6c7c72; background: transparent; }
+.pid-page-controls button { width: 22px; height: 22px; border: 1px solid #9eada2; border-radius: 1px; padding: 0; background: #edf1e6; color: #30483d; font: 18px/1 Arial,sans-serif; cursor: pointer; }
+.pid-page-controls button:hover { background: #d2ddce; }
+.pid-page-controls button:focus-visible, .pid-pass-group-button:focus-visible, .pid-pass-details button:focus-visible { outline: 2px solid #1a4e69; outline-offset: 2px; }
+.pid-route-window { position: relative; height: 218px; padding: 0 24px; overflow: hidden; }
+.pid-route-track { position: relative; display: grid; grid-template-columns: repeat(var(--pid-stop-count),minmax(0,1fr)); width: 100%; height: 100%; animation: rail-page-in .35s ease-out; }
+.pid-route-track::before { content: ""; position: absolute; left: 0; right: 0; top: 55px; height: 14px; background: color-mix(in srgb,var(--pid-color) 80%,#182a23); clip-path: polygon(0 0,calc(100% - 16px) 0,100% 50%,calc(100% - 16px) 100%,0 100%); }
+.pid-route-track.is-continuation::after { content: "···"; position: absolute; z-index: 2; left: calc(100% / var(--pid-stop-count)); top: 51px; width: 26px; height: 22px; transform: translateX(-50%); color: #526e5e; background: #f5f5eb; font: 700 21px/18px Arial,sans-serif; text-align: center; }
+.pid-route-stop { position: relative; display: grid; grid-template-rows: 45px 32px 1fr; justify-items: center; min-width: 0; text-align: center; }
+.pid-stop-minutes { align-self: start; margin-top: 10px; min-height: 25px; color: #1b353b; font: 700 22px Arial,"Rail CJK",sans-serif; }
+.pid-stop-minutes > small { margin-left: 3px; font-size: 10px; }
+.pid-route-node { z-index: 1; align-self: center; width: 13px; height: 26px; border: 3px solid #2d4745; background: #fafbf0; }
+.pid-station-name { display: block; width: 100%; height: 106px; align-self: start; margin-top: 7px; font-size: var(--pid-station-font-size); letter-spacing: .08em; line-height: 1.2; }
+.pid-route-stop.is-next::before { content: ""; position: absolute; z-index: 2; top: 37px; width: 22px; height: 11px; background: #c53326; clip-path: polygon(0 0,100% 0,50% 100%); animation: rail-indicator 1.4s steps(1,end) infinite; }
+.pid-route-stop.is-next .pid-route-node { border-color: #c53326; background: #ffdf7e; }
+.pid-route-stop.is-next > strong { color: #ac2c23; }
+.pid-route-stop.is-pass .pid-route-node { width: 11px; height: 11px; transform: rotate(45deg); border: 2px solid #6e7e73; background: #e9eee1; }
+.pid-route-stop.is-pass .pid-stop-minutes, .pid-route-stop.is-passed .pid-stop-minutes { font-size: 11px; line-height: 22px; color: #65756c; }
+.pid-route-stop.is-pass > strong { color: #66776e; font-size: min(var(--pid-station-font-size),17px); }
+.pid-route-stop.is-passed > strong { color: #7c897c; }
+.pid-route-stop.is-passed .pid-route-node { border-color: #8e9b8d; background: #cdd4c4; }
+.pid-route-stop.is-pass-group .pid-stop-minutes { font-size: 11px; line-height: 22px; color: #53695c; white-space: nowrap; }
+.pid-pass-segment { z-index: 1; align-self: center; width: 44px; height: 22px; border-block: 2px dashed #647d6c; background: #e2e9da; color: #51695a; font: 700 21px/18px Arial,sans-serif; }
+.pid-pass-group-button { display: block; width: 100%; min-width: 0; align-self: start; margin-top: 7px; padding: 4px 5px; border: 1px dashed #a2b09e; border-radius: 0; color: #536858; background: #ebefe3; font: 11px/1.4 "Rail CJK",sans-serif; cursor: pointer; }
+.pid-pass-group-button:hover { background: #dce6d4; border-color: #607d65; }
+.pid-pass-group-button small { display: block; margin-top: 6px; color: #647d6c; font-size: 9px; }
+.pid-pass-ellipsis { display: block; height: 17px; color: #758a7a; }
+.pid-pass-details { position: absolute; z-index: 4; inset: 79px 14px 7px; display: flex; flex-direction: column; border: 1px solid #82947d; background: #f0f4e8; box-shadow: 0 3px 10px #32432b30; }
+.pid-pass-details > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 10px; border-bottom: 1px solid #b2c0aa; color: #405841; font-size: 11px; }
+.pid-pass-details button { border: 0; padding: 3px 0 3px 10px; color: #4e6652; background: none; font: 11px "Rail CJK",sans-serif; cursor: pointer; }
+.pid-pass-details ol { min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); align-content: start; gap: 8px 16px; margin: 0; padding: 9px 10px; list-style: none; scrollbar-width: thin; }
+.pid-pass-details li { min-width: 0; display: flex; align-items: baseline; gap: 6px; font-size: 11px; }
+.pid-pass-details li > span { flex: none; color: #778b75; font-size: 9px; }
+.pid-pass-details li strong { overflow-wrap: anywhere; color: #405c45; }
+.pid-pass-details li.is-passed strong { color: #7b8874; }
+.pid-terminus-label { position: absolute; bottom: 0; color: #677369; font-size: 8px; }
+.pid-information-row { display: grid; grid-template-columns: 90px minmax(0,1fr); gap: 14px; align-items: center; height: 49px; padding: 8px 18px; border-top: 1px solid #b1bdad; color: #2b3a38; background: #dfe6d9; font-size: 13px; }
+.pid-information-row > strong { font-size: 12px; line-height: 1.3; border-right: 1px solid #a4b29e; }
+.pid-information-row > strong span { display: block; font: 8px/1.5 Arial,sans-serif; letter-spacing: .04em; }
+.pid-transfer-list { display: inline-flex; align-items: center; gap: 16px; min-width: 0; }
+.pid-transfer-list > span { border-left: 6px solid var(--transfer-color); padding: 2px 0 2px 7px; font-size: 13px; white-space: nowrap; }
+
+@media (max-width: 920px) {
+  .is-board .departure-board-view { padding: 14px; }
+  .board-fascia { grid-template-columns: 32px minmax(0,1fr) auto; padding: 15px; gap: 12px; }
+  .board-rail-symbol { width: 28px; height: 37px; }
+  .board-heading { display: none; }
+  .board-screen-clock { padding-left: 12px; }
+  .board-screen-clock > span small { display: none; }
+  .board-screen-clock > strong { font-size: 29px; }
+}
+@media (max-height: 950px) {
+  .is-board .departure-board-table td { height: 54px; padding-block: 7px; }
+  .board-fascia { padding-block: 13px; }
+  .board-information-strip { min-height: 50px; padding-block: 7px; }
+}
+@media (max-height: 800px) {
+  .station-display.is-board { grid-template-rows: 50px auto minmax(0,1fr); }
+  .is-board .station-display-toolbar { min-height: 44px; padding-block: 7px; }
+  .is-board .departure-board-view { padding: 10px 14px; }
+  .is-board .board-controls { margin-bottom: 10px; }
+  .is-board .departure-board-table td { height: 44px; padding: 4px 12px; }
+  .is-board .departure-board-table th { padding-block: 7px; }
+  .is-board .board-destination > span { line-height: 1.2; }
+  .board-fascia { padding-block: 10px; }
+  .board-station-name h1 { font-size: 28px; }
+  .board-heading strong { font-size: 22px; }
+}
+@container (max-width: 540px) {
+  .pid-header { grid-template-columns: 78px minmax(0,1fr) 65px; padding: 8px 10px; gap: 8px; }
+  .pid-category { font-size: min(var(--pid-category-size),17px); }
+  .pid-destination { gap: 5px; }
+  .pid-destination > span { font-size: 9px; }
+  .pid-destination > span small { display: none; }
+  .pid-train-number strong { font-size: 17px; }
+  .pid-next-row { grid-template-columns: 65px minmax(0,1fr) 70px; gap: 10px; padding: 12px 10px; height: 83px; }
+  .pid-next-label > span { font-size: 12px; }
+  .pid-next-label > small { font-size: 12px; }
+  .pid-eta strong { font-size: 27px; }
+  .pid-eta > small { font-size: 8px; }
+  .pid-route-window { padding: 0 12px; height: 208px; }
+  .pid-station-name { font-size: min(var(--pid-station-font-size),19px); }
+  .pid-stop-minutes { font-size: 19px; }
+  .pid-information-row { grid-template-columns: 73px minmax(0,1fr); padding: 8px 10px; gap: 10px; font-size: 11px; }
+  .pid-map-caption { padding-inline: 12px; gap: 5px; font-size: 9px; }
+  .pid-page-controls { gap: 5px; }
+  .pid-route-legend { gap: 8px; }
+  .pid-pass-details ol { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .display-marquee.is-scrolling .display-marquee-track, .display-marquee.is-vertical.is-scrolling .display-marquee-track, .is-board .board-status.is-imminent, .pid-route-stop.is-next::before, .pid-route-track, .pid-focus-name, .is-board .departure-board-table tbody tr { animation: none; }
+  .display-marquee { overflow-x: auto; }
+  .display-marquee.is-vertical { overflow-x: hidden; overflow-y: auto; }
+  .display-marquee-track > span[aria-hidden] { display: none; }
+}

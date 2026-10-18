@@ -20,8 +20,8 @@ after(async () => {
 await writeFile(join(compiledRoot, "package.json"), '{"type":"commonjs"}');
 const sources = [
   "domain/types.ts", "domain/platform.ts", "domain/geometry.ts", "domain/sample.ts",
-  "domain/simulation.ts", "domain/schedule.ts", "domain/stationBoard.ts", "lib/time.ts",
-  "components/StationDisplay.tsx", "components/ServiceEditor.tsx",
+  "domain/simulation.ts", "domain/schedule.ts", "domain/stationBoard.ts", "domain/departures.ts", "domain/trainPid.ts", "lib/time.ts",
+  "components/StationDisplay.tsx", "components/TrainPid.tsx", "components/DisplayMarquee.tsx", "components/ServiceEditor.tsx", "components/DepartureRangeEditor.tsx",
 ];
 await Promise.all(sources.map(async (file) => {
   const source = await readFile(join(projectRoot, "app", file), "utf8");
@@ -47,7 +47,9 @@ const { createReversedSchedule, createUniformSchedule } = load("domain/schedule.
 const { getStationBoardEvents, getStationTimetable } = load("domain/stationBoard.js");
 const { normalizeTimingPlatform, reversePlatform, getStationPlatforms, matchesPlatforms } = load("domain/platform.js");
 const { StationDisplay } = load("components/StationDisplay.js");
+const { TrainPid } = load("components/TrainPid.js");
 const { ServiceEditor } = load("components/ServiceEditor.js");
+const { buildPidRoutePages } = load("domain/trainPid.js");
 
 const { stations, lines, services } = initialNetwork;
 const routesFor = (items) => new Map(items.map((service) => [
@@ -254,4 +256,92 @@ test("Service editor exposes required stopping platforms and blank passing platf
   assert.match(html, /aria-label="西郊站台"[^>]*required=""[^>]*value="1"/);
   assert.match(html, /aria-label="江湾站台"[^>]*placeholder="无站台（正线通过）"[^>]*value=""/);
   assert.match(html, /aria-label="科创园站台"[^>]*value="2"/);
+});
+
+test("LCD shows the actual dwelling platform and keeps passing stations out of the next-stop headline", () => {
+  const service = services[0];
+  const props = { trainId: "G102", departureIndex: 0, service, route: routes.get(service.id), stations, lines, onClose: noop };
+  const dwelling = renderToStaticMarkup(createElement(TrainPid, { ...props, clockSeconds: 21600 + 700 }));
+  assert.match(dwelling, /现在停靠/);
+  assert.match(dwelling, /class="pid-focus-name"[^>]*title="中央站"/);
+  assert.match(dwelling, /class="pid-eta"><strong>.*?<span>1<\/span>/);
+  assert.doesNotMatch(dwelling, /右侧车门|左侧车门/);
+  const moving = renderToStaticMarkup(createElement(TrainPid, { ...props, clockSeconds: 21600 + 900 }));
+  assert.match(moving, /class="pid-focus-name"[^>]*title="临港"/);
+  assert.match(moving, /is-pass[^>]*title="科创园 · 通过 ·/);
+});
+
+test("LCD ends next-stop signalling when the run has finished", () => {
+  const service = services[0];
+  const html = renderToStaticMarkup(createElement(TrainPid, { trainId: "G102", departureIndex: 0, service, route: routes.get(service.id), stations, lines, clockSeconds: 21600 + 1700, onClose: noop }));
+  assert.match(html, /END OF SERVICE/);
+  assert.doesNotMatch(html, /class="pid-route-stop [^"]*is-next/);
+});
+
+function pidRouteFixture(count, stops) {
+  const route = { valid: true, stations: Array.from({ length: count }, (_, index) => ({ stationId: `station-${index}`, occurrenceKey: `station-${index}:0`, distance: index * 1000 })), points: [], cumulativeDistances: [], totalDistance: (count - 1) * 1000 };
+  const service = { ...services[0], routeLegs: [], timings: Object.fromEntries(route.stations.map((station, index) => [station.occurrenceKey, stops.includes(index) ? { mode: "stop", platform: "1", arrival: index * 60, departure: index * 60 + 10 } : { mode: index % 2 ? "pass-flexible" : "pass-exact", platform: null, pass: index * 60 }])) };
+  return { route, service };
+}
+
+test("LCD compacts an entire continuous pass run, including implicitly passing stations", () => {
+  const { route, service } = pidRouteFixture(70, [0, ...Array.from({ length: 10 }, (_, i) => i + 60)]);
+  delete service.timings["station-30:0"];
+  const pages = buildPidRoutePages(service, route, 60, 4);
+  const group = pages[0].items.find((item) => item.kind === "pass-group");
+  assert.equal(group.stations.length, 59);
+  assert.equal(group.stations[0].index, 1);
+  assert.equal(group.stations.at(-1).index, 59);
+  assert.ok(group.stations.every((item) => item.isPass));
+  assert.ok(pages[0].items.some((item) => item.kind === "station" && item.index === 0));
+  for (const page of pages) assert.ok(page.items.some((item) => item.kind === "station" && item.index === 60));
+});
+
+test("LCD leaves one or two passes individually visible and distinguishes unspecified passes", () => {
+  const { route, service } = pidRouteFixture(5, [0, 3, 4]);
+  delete service.timings["station-2:0"];
+  const pages = buildPidRoutePages(service, route, 3, 4);
+  assert.ok(pages[0].items.every((item) => item.kind === "station"));
+  assert.deepEqual(pages[0].items.map((item) => item.isPass), [false, true, true, false]);
+  const html = renderToStaticMarkup(createElement(TrainPid, {
+    trainId: "T1", departureIndex: 0, service, route, stations: route.stations.map((item) => ({ id: item.stationId, name: item.stationId, position: { x: 0, y: 0 } })), lines: [], clockSeconds: 21600 + 20, onClose: noop,
+  }));
+  assert.match(html, /is-pass[^>]*data-occurrence="station-2:0"[^>]*title="station-2 · 通过/);
+  assert.match(html, /class="legend-stop"/);
+  assert.match(html, /class="legend-pass"/);
+});
+
+test("long LCD routes cover every remaining stop and pin the next stop on every page at each screen capacity", () => {
+  const { route, service } = pidRouteFixture(80, Array.from({ length: 80 }, (_, i) => i));
+  for (const capacity of [4, 5, 6, 8]) {
+    for (const focusIndex of [1, 33, 79]) {
+      const pages = buildPidRoutePages(service, route, focusIndex, capacity);
+      const indices = new Set();
+      pages.forEach((page, index) => {
+        assert.ok(page.items.length <= capacity);
+        assert.equal(page.continued, index > 0);
+        assert.ok(page.items.some((item) => item.index === focusIndex));
+        page.items.forEach((item) => indices.add(item.index));
+      });
+      assert.deepEqual([...indices].sort((a, b) => a - b), Array.from({ length: 81 - focusIndex }, (_, i) => focusIndex - 1 + i));
+    }
+  }
+});
+
+test("LCD route compaction preserves repeated occurrences and groups separated pass runs independently", () => {
+  const { route, service } = pidRouteFixture(11, [0, 4, 9, 10]);
+  route.stations[6].stationId = route.stations[2].stationId;
+  const items = buildPidRoutePages(service, route, 4, 8).flatMap((page) => page.items);
+  const groups = items.filter((item) => item.kind === "pass-group");
+  assert.deepEqual(groups.map((group) => group.stations.length), [3, 4]);
+  assert.equal(groups[0].stations[1].station.stationId, groups[1].stations[1].station.stationId);
+  assert.notEqual(groups[0].stations[1].station.occurrenceKey, groups[1].stations[1].station.occurrenceKey);
+});
+
+test("LCD marks a route gap only when a later page actually skips stations after its pinned stop", () => {
+  const { route, service } = pidRouteFixture(12, [0, ...Array.from({ length: 9 }, (_, i) => i + 3)]);
+  const narrow = buildPidRoutePages(service, route, 3, 4);
+  assert.equal(narrow[1].gapAfterFocus, false);
+  assert.equal(narrow[2].gapAfterFocus, true);
+  assert.equal(buildPidRoutePages(service, route, 3, 8)[1].gapAfterFocus, true);
 });
