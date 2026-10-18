@@ -156,6 +156,31 @@ button { color: inherit; }
 .canvas-zoom-controls .intercontinental-zoom { padding: 0 8px; color: #8fa199; font-size: 8px; }
 .osm-attribution { position: absolute; z-index: 8; right: 14px; bottom: 34px; padding: 3px 6px; border-radius: 3px; color: #87928a; background: rgba(18,22,19,.78); font-size: 8px; text-decoration: none; backdrop-filter: blur(8px); }
 .osm-attribution:hover { color: #d4dbd5; }
+
+.app-shell.is-train-focus { min-width: 0; grid-template-columns: minmax(0,1fr); }
+.is-train-focus > .tool-rail, .is-train-focus > .library-panel, .is-train-focus > .inspector-panel { display: none; }
+.is-train-focus > .canvas-stage { grid-column: 1; }
+.is-train-focus .rail-canvas.is-following { cursor: default; }
+.is-train-focus .osm-attribution { right: auto; left: 14px; }
+.is-train-focus .topbar { grid-template-columns: auto minmax(0,1fr) auto; }
+.is-train-focus .top-actions > button { display: none; }
+.train-focus-banner { position: absolute; z-index: 9; top: 14px; right: 16px; max-width: calc(100% - 250px); display: flex; align-items: center; gap: 12px; padding: 9px 12px; border: 1px solid #536c60; border-left: 3px solid var(--teal); color: #d6e6dd; background: #19251fee; box-shadow: 0 4px 18px #0004; }
+.train-focus-target { flex: none; color: var(--teal); font: 26px/1 Arial,sans-serif; }
+.train-focus-banner > div { min-width: 0; }
+.train-focus-banner small { display: block; color: #9bb5a6; font-size: 8px; letter-spacing: .08em; white-space: nowrap; }
+.train-focus-banner strong { display: block; max-width: 220px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.train-focus-banner button { flex: none; margin-left: 8px; border: 1px solid #5f7b6b; padding: 6px 8px; border-radius: 1px; color: #c7dfd0; background: transparent; font-size: 11px; cursor: pointer; }
+.train-focus-banner button:hover { background: #3e5b4c; }
+.train-focus-banner button:focus-visible { outline: 2px solid var(--teal); outline-offset: 3px; }
+.train-focus-banner kbd { margin-left: 5px; color: #8da998; font-size: 9px; }
+
+@media (max-width: 640px) {
+  .is-train-focus .brand-block, .is-train-focus .top-actions, .is-train-focus .canvas-status > span { display: none; }
+  .is-train-focus .topbar { grid-template-columns: minmax(0,1fr); padding-inline: 10px; }
+  .is-train-focus .clock-cluster { justify-content: center; padding-inline: 0; gap: 10px; }
+  .is-train-focus .canvas-status { justify-content: center; }
+  .train-focus-banner { top: 90px; right: 12px; max-width: calc(100% - 24px); padding: 7px 10px; }
+}
 kbd { display: inline-block; min-width: 19px; padding: 2px 5px; border: 1px solid var(--line-strong); border-bottom-color: rgba(255,255,255,.26); border-radius: 3px; text-align: center; color: #aeb6af; background: rgba(255,255,255,.035); font-family: var(--font-geist-mono), monospace; font-size: 8px; }
 .draft-actions { position: absolute; top: 16px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 11px; padding: 8px 9px 8px 14px; border: 1px solid var(--line-strong); border-radius: 6px; background: rgba(27,31,28,.94); box-shadow: 0 12px 35px rgba(0,0,0,.26); }
 .draft-actions strong { font-size: 11px; }

@@ -42,7 +42,7 @@ const require = createRequire(import.meta.url);
 const load = (file) => require(join(compiledRoot, file));
 const { initialNetwork } = load("domain/sample.js");
 const { compileRoute } = load("domain/geometry.js");
-const { buildAnchors, collectActiveTrains } = load("domain/simulation.js");
+const { buildAnchors, collectActiveTrains, getTrainFocusPosition } = load("domain/simulation.js");
 const { createReversedSchedule, createUniformSchedule } = load("domain/schedule.js");
 const { getStationBoardEvents, getStationTimetable } = load("domain/stationBoard.js");
 const { normalizeTimingPlatform, reversePlatform, getStationPlatforms, matchesPlatforms } = load("domain/platform.js");
@@ -63,6 +63,38 @@ const boardAt = (stationId, items = services, clock = 6 * 3600) => (
   getStationBoardEvents(stationId, items, routesFor(items), stations, lines, clock)
 );
 const noop = () => {};
+
+test("train focus identifies the exact departure even when train numbers repeat", () => {
+  const service = { ...services[0], departures: [21600, 21720], idFormula: "SAME" };
+  const route = routes.get(service.id);
+  const active = collectActiveTrains([service], routes, 22200);
+  assert.equal(active.length, 2);
+  for (const train of active) {
+    assert.deepEqual(getTrainFocusPosition(service, route, train.departureIndex, 22200), { x: train.x, y: train.y });
+  }
+  assert.notDeepEqual(getTrainFocusPosition(service, route, 0, 22200), getTrainFocusPosition(service, route, 1, 22200));
+});
+
+test("train focus stays at route endpoints outside operating time without adding active trains", () => {
+  const service = { ...services[0], departures: [21600] };
+  const route = routes.get(service.id);
+  assert.deepEqual(getTrainFocusPosition(service, route, 0, 21540), route.points[0]);
+  assert.deepEqual(getTrainFocusPosition(service, route, 0, 24000), route.points.at(-1));
+  assert.equal(collectActiveTrains([service], routes, 21540).length, 0);
+  assert.equal(collectActiveTrains([service], routes, 24000).length, 0);
+  assert.equal(getTrainFocusPosition(service, route, 99, 22200), null);
+  assert.equal(getTrainFocusPosition(service, { ...route, valid: false }, 0, 22200), null);
+});
+
+test("train focus follows an overnight run using the same position as the simulation", () => {
+  const service = { ...services[0], departures: [86100] };
+  const route = routes.get(service.id);
+  const [train] = collectActiveTrains([service], routes, 300);
+  assert.ok(train);
+  assert.deepEqual(getTrainFocusPosition(service, route, 0, 300), { x: train.x, y: train.y });
+  assert.deepEqual(getTrainFocusPosition(service, route, 0, 86040), route.points[0]);
+  assert.deepEqual(getTrainFocusPosition(service, route, 0, 2000), route.points.at(-1));
+});
 
 test("old timing rules acquire a stopping platform or an explicit null for passing", () => {
   assert.deepEqual(normalizeTimingPlatform({ mode: "stop", arrival: 0, departure: 30 }), {

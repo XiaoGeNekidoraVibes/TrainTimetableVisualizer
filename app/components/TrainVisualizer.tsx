@@ -118,6 +118,7 @@ function useSimulationClock(initialSeconds: number) {
 export function TrainVisualizer() {
   const [network, setNetwork] = useState<NetworkSnapshot>(initialNetwork);
   const [selection, setSelection] = useState<Selection>(null);
+  const [focusedTrainKey, setFocusedTrainKey] = useState<string | null>(null);
   const [tool, setTool] = useState<ToolMode>("select");
   const [draftStationIds, setDraftStationIds] = useState<string[]>([]);
   const [activeCount, setActiveCount] = useState(0);
@@ -142,6 +143,12 @@ export function TrainVisualizer() {
   const selectedTrainService = selection?.type === "train"
     ? network.services.find((service) => service.id === selection.serviceId)
     : undefined;
+  const selectedTrainKey = selection?.type === "train" && selectedTrainService
+    && compiledRoutes.get(selectedTrainService.id)?.valid
+    ? `${selection.serviceId}:${selection.departureIndex}`
+    : null;
+  if (focusedTrainKey && focusedTrainKey !== selectedTrainKey) setFocusedTrainKey(null);
+  const trainFocusMode = focusedTrainKey !== null && focusedTrainKey === selectedTrainKey;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -368,7 +375,12 @@ export function TrainVisualizer() {
         saveProject();
         return;
       }
+      if (event.key === "Escape" && trainFocusMode) {
+        setFocusedTrainKey(null);
+        return;
+      }
       if (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (trainFocusMode && ["v", "s", "l", "enter"].includes(event.key.toLowerCase())) return;
       if (event.key.toLowerCase() === "v") selectTool("select");
       if (event.key.toLowerCase() === "s") selectTool("station");
       if (event.key.toLowerCase() === "l") selectTool("line");
@@ -392,10 +404,10 @@ export function TrainVisualizer() {
       window.removeEventListener("keydown", handleKey);
       window.removeEventListener("open-service", openService);
     };
-  }, [clockPlaying, finishLine, saveProject, setClockPlaying, tool]);
+  }, [clockPlaying, finishLine, saveProject, setClockPlaying, tool, trainFocusMode]);
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell ${trainFocusMode ? "is-train-focus" : ""}`}>
       <header className="topbar">
         <div className="brand-block">
           <div className="brand-mark"><span /><span /></div>
@@ -497,6 +509,7 @@ export function TrainVisualizer() {
           compiledRoutes={compiledRoutes}
           tool={tool}
           selection={selection}
+          followedTrainKey={trainFocusMode ? focusedTrainKey : null}
           draftStationIds={draftStationIds}
           showOsm={showOsm}
           osmOpacity={osmOpacity}
@@ -510,6 +523,13 @@ export function TrainVisualizer() {
           onAppendDraftStation={(stationId) => setDraftStationIds((current) => current.at(-1) === stationId || current.includes(stationId) ? current : [...current, stationId])}
           onActiveCountChange={setActiveCount}
         />
+        {trainFocusMode && selection?.type === "train" && (
+          <div className="train-focus-banner" role="status">
+            <span className="train-focus-target" aria-hidden="true">⌖</span>
+            <div><small>FOCUS MODE · 跟随列车</small><strong title={selection.id}>{selection.id}</strong></div>
+            <button type="button" onClick={() => setFocusedTrainKey(null)}>退出 <kbd>Esc</kbd></button>
+          </div>
+        )}
         <div className="map-controls" aria-label="地图底图设置">
           <label className="map-toggle">
             <input type="checkbox" checked={showOsm} onChange={(event) => setShowOsm(event.target.checked)} />
@@ -534,12 +554,14 @@ export function TrainVisualizer() {
             stations={network.stations}
             lines={network.lines}
             clockSeconds={((clock.displaySeconds % 86400) + 86400) % 86400}
+            focusMode={trainFocusMode}
+            onToggleFocus={() => setFocusedTrainKey(trainFocusMode ? null : selectedTrainKey)}
             onClose={() => setSelection(null)}
           />
         )}
         <div className="canvas-status">
           <span>{notice}</span>
-          <div><kbd>滚轮</kbd> 缩放 <kbd>拖动</kbd> 平移</div>
+          <div>{trainFocusMode ? <><kbd>滚轮</kbd> 缩放 · 列车保持居中 <kbd>Esc</kbd> 退出</> : <><kbd>滚轮</kbd> 缩放 <kbd>拖动</kbd> 平移</>}</div>
         </div>
         {tool === "line" && (
           <div className="draft-actions">

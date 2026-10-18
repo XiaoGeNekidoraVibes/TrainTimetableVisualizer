@@ -157,6 +157,23 @@ function nextStationAfter(route: CompiledRoute, distance: number) {
   return route.stations[low];
 }
 
+/** Keep a followed run at its origin/terminus when the simulation clock is outside its run. */
+export function getTrainFocusPosition(
+  service: Service,
+  route: CompiledRoute,
+  departureIndex: number,
+  clockSeconds: number,
+) {
+  const departure = service.departures[departureIndex];
+  if (!route.valid || departure === undefined) return null;
+  const runtime = getServiceRuntime(service, route);
+  if (runtime.error || runtime.anchors.length < 2) return null;
+  let relativeTime = normalizeTimeOfDay(clockSeconds) - departure;
+  if (relativeTime < -43200) relativeTime += 86400;
+  const clampedTime = Math.max(runtime.anchors[0].time, Math.min(runtime.anchors.at(-1)!.time, relativeTime));
+  return positionAtRelativeTime(route, runtime.anchors, clampedTime)?.point ?? null;
+}
+
 export function collectActiveTrains(
   services: Service[],
   compiledRoutes: Map<string, CompiledRoute>,

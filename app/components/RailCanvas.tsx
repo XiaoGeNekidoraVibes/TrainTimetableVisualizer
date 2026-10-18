@@ -8,7 +8,7 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { distanceToSegment, sampleLine } from "../domain/geometry";
-import { collectActiveTrains } from "../domain/simulation";
+import { collectActiveTrains, getTrainFocusPosition } from "../domain/simulation";
 import type {
   CompiledRoute,
   Point,
@@ -29,6 +29,7 @@ type RailCanvasProps = {
   compiledRoutes: Map<string, CompiledRoute>;
   tool: ToolMode;
   selection: Selection;
+  followedTrainKey: string | null;
   draftStationIds: string[];
   showOsm: boolean;
   osmOpacity: number;
@@ -57,6 +58,7 @@ type RenderSnapshot = {
   services: Service[];
   compiledRoutes: Map<string, CompiledRoute>;
   selection: Selection;
+  followedTrainKey: string | null;
   draftStationIds: string[];
   stationMap: Map<string, Station>;
   sampledLines: Map<string, ReturnType<typeof sampleLine>>;
@@ -211,6 +213,7 @@ export function RailCanvas({
   compiledRoutes,
   tool,
   selection,
+  followedTrainKey,
   draftStationIds,
   showOsm,
   osmOpacity,
@@ -229,6 +232,7 @@ export function RailCanvas({
   const activeCountRef = useRef(-1);
   const focusAnimationRef = useRef(0);
   const lastFocusedLineRef = useRef<string | null>(null);
+  const previousViewRef = useRef<{ center: Point; scale: number } | null>(null);
   const stationMap = useMemo(
     () => new Map(stations.map((station) => [station.id, station])),
     [stations],
@@ -294,6 +298,7 @@ export function RailCanvas({
     services,
     compiledRoutes,
     selection,
+    followedTrainKey,
     draftStationIds,
     stationMap,
     sampledLines,
@@ -310,6 +315,7 @@ export function RailCanvas({
       services,
       compiledRoutes,
       selection,
+      followedTrainKey,
       draftStationIds,
       stationMap,
       sampledLines,
@@ -327,6 +333,7 @@ export function RailCanvas({
     osmOpacity,
     sampledLines,
     selection,
+    followedTrainKey,
     services,
     showOsm,
     stationMap,
@@ -345,6 +352,10 @@ export function RailCanvas({
 
     const resize = () => {
       const bounds = canvas.getBoundingClientRect();
+      if (initializedRef.current) {
+        cameraRef.current.x += (bounds.width - width) / 2;
+        cameraRef.current.y += (bounds.height - height) / 2;
+      }
       width = Math.max(1, bounds.width);
       height = Math.max(1, bounds.height);
       dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -368,6 +379,36 @@ export function RailCanvas({
     const draw = () => {
       const render = renderSnapshotRef.current;
       const camera = cameraRef.current;
+      const clockSeconds = render.getClockSeconds();
+      const trains = collectActiveTrains(render.services, render.compiledRoutes, clockSeconds);
+      trainsRef.current = trains;
+      if (render.followedTrainKey) {
+        if (!previousViewRef.current) {
+          previousViewRef.current = {
+            center: screenToWorld({ x: width / 2, y: height / 2 }, camera),
+            scale: camera.scale,
+          };
+        }
+        const train = trains.find((candidate) => candidate.key === render.followedTrainKey);
+        const followedSelection = render.selection?.type === "train" ? render.selection : null;
+        const service = !train && followedSelection
+          ? render.services.find((candidate) => candidate.id === followedSelection.serviceId)
+          : undefined;
+        const route = service && render.compiledRoutes.get(service.id);
+        const position = train ?? (service && route && followedSelection
+          ? getTrainFocusPosition(service, route, followedSelection.departureIndex, clockSeconds)
+          : null);
+        if (position) {
+          camera.x = width / 2 - position.x * camera.scale;
+          camera.y = height / 2 - position.y * camera.scale;
+        }
+      } else if (previousViewRef.current) {
+        const previous = previousViewRef.current;
+        camera.scale = previous.scale;
+        camera.x = width / 2 - previous.center.x * camera.scale;
+        camera.y = height / 2 - previous.center.y * camera.scale;
+        previousViewRef.current = null;
+      }
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
       context.clearRect(0, 0, width, height);
       context.fillStyle = "#151816";
@@ -426,8 +467,6 @@ export function RailCanvas({
         context.fillText(station.name, station.position.x, station.position.y - 13 / camera.scale);
       }
 
-      const trains = collectActiveTrains(render.services, render.compiledRoutes, render.getClockSeconds());
-      trainsRef.current = trains;
       if (trains.length !== activeCountRef.current) {
         activeCountRef.current = trains.length;
         render.onActiveCountChange(trains.length);
@@ -439,7 +478,7 @@ export function RailCanvas({
       const denseMode = trains.length > 2500;
       for (const train of trains) {
         if (train.x < visibleLeft || train.x > visibleRight || train.y < visibleTop || train.y > visibleBottom) continue;
-        const selected = render.selection?.type === "train" && render.selection.id === train.id && render.selection.serviceId === train.serviceId;
+        const selected = render.selection?.type === "train" && render.selection.departureIndex === train.departureIndex && render.selection.serviceId === train.serviceId;
         if (denseMode && !selected) {
           const unit = 1 / camera.scale;
           context.fillStyle = train.color;
@@ -524,6 +563,7 @@ export function RailCanvas({
   };
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (followedTrainKey) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const point = eventPoint(event, canvas);
@@ -549,6 +589,7 @@ export function RailCanvas({
   };
 
   const handlePointerMove = (event: ReactPointerEvent<HTMLCanvasElement>) => {
+    if (followedTrainKey) return;
     const canvas = canvasRef.current;
     const pointer = pointerRef.current;
     if (!canvas || !pointer || pointer.pointerId !== event.pointerId) return;
@@ -584,7 +625,7 @@ export function RailCanvas({
     if (!canvas) return;
     const point = eventPoint(event, canvas);
     const pointer = pointerRef.current;
-    if (pointer && pointer.pointerId === event.pointerId && !pointer.moved) {
+    if (!followedTrainKey && pointer && pointer.pointerId === event.pointerId && !pointer.moved) {
       const hit = findHit(point);
       if (tool === "station" && !hit) {
         onAddStation(screenToWorld(point, cameraRef.current));
@@ -602,7 +643,9 @@ export function RailCanvas({
     event.preventDefault();
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const point = eventPoint(event, canvas);
+    const point = followedTrainKey
+      ? { x: canvas.clientWidth / 2, y: canvas.clientHeight / 2 }
+      : eventPoint(event, canvas);
     const camera = cameraRef.current;
     const before = screenToWorld(point, camera);
     const factor = Math.exp(-event.deltaY * 0.0022);
@@ -627,7 +670,7 @@ export function RailCanvas({
     <>
     <canvas
       ref={canvasRef}
-      className={`rail-canvas tool-${tool}`}
+      className={`rail-canvas tool-${tool} ${followedTrainKey ? "is-following" : ""}`}
       aria-label="铁路运行画布"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

@@ -16,6 +16,8 @@ type TrainPidProps = {
   stations: Station[];
   lines: RailLine[];
   clockSeconds: number;
+  focusMode?: boolean;
+  onToggleFocus?: () => void;
   onClose: () => void;
 };
 
@@ -33,6 +35,8 @@ export function TrainPid({
   stations,
   lines,
   clockSeconds,
+  focusMode = false,
+  onToggleFocus,
   onClose,
 }: TrainPidProps) {
   const model = useMemo(() => {
@@ -119,7 +123,7 @@ export function TrainPid({
 
   return (
     <aside
-      className="train-pid"
+      className={`train-pid ${focusMode ? "is-compact" : ""}`}
       ref={screenRef}
       style={{
         "--pid-color": service.color,
@@ -129,7 +133,10 @@ export function TrainPid({
       aria-label={`${trainId} 车内旅客信息显示器`}
     >
       <div className="pid-bezel-label"><span>车内案内 <small>PASSENGER INFORMATION</small></span>
-        <button type="button" onClick={onClose} aria-label="关闭列车 LCD">×</button>
+        <div className="pid-window-controls">
+          {onToggleFocus && <button type="button" className="pid-focus-toggle" onClick={onToggleFocus} aria-pressed={focusMode} title={focusMode ? "退出跟随并还原 LCD" : "居中跟随列车，将 LCD 缩至角落"}>{focusMode ? "还原 LCD" : "⌖ Focus Mode"}</button>}
+          <button type="button" onClick={onClose} aria-label="关闭列车 LCD">×</button>
+        </div>
       </div>
       <div className="pid-screen">
         <header className="pid-header">
