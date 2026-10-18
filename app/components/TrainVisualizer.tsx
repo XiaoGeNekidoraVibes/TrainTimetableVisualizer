@@ -474,7 +474,7 @@ export function TrainVisualizer() {
           <h1>铁路网络</h1>
           <p>{network.stations.length} 站 · {network.lines.length} 线</p>
         </div>
-        <section className="library-section">
+        <section className="library-section line-library">
           <div className="library-title"><span>线路</span><small>{network.lines.length}</small></div>
           <div className="entity-list">
             {network.lines.map((line) => (

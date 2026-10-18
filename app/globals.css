@@ -91,6 +91,9 @@ button { color: inherit; }
 .library-top h1 { margin: 7px 0 5px; font-size: 20px; letter-spacing: -.02em; }
 .library-top p { margin: 0; color: var(--muted); font-size: 11px; }
 .library-section { padding: 17px 12px 5px; }
+.line-library { display: flex; flex-direction: column; flex: 0 1 auto; min-height: 0; max-height: min(35%,320px); }
+.line-library > .library-title { flex-shrink: 0; }
+.line-library > .entity-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
 .service-library { min-height: 0; flex: 1; overflow: auto; }
 .library-title { display: flex; align-items: center; justify-content: space-between; padding: 0 7px 9px; color: #bac2bb; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .library-title small { color: #717a72; font-family: var(--font-geist-mono), monospace; }
