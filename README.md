@@ -1,100 +1,139 @@
-# vinext-starter
+# Rail Flow · 列车运行可视化
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+## 概述
 
-## Prerequisites
+Rail Flow（TrainTimetableVisualizer）是一个在浏览器中编辑铁路网络、编排列车时刻并模拟列车运行的可视化工作台。用户可以创建站点与线路，定义列车运行方案（Service），再通过地图、车站看板和车内信息屏观察运行情况。
 
-- Node.js `>=22.13.0`
+项目内置示例网络，首次打开即可查看运行效果。铁路网络与时刻配置由浏览器本地保存，也可以通过 JSON 文件导入、导出。
 
-## Quick Start
+## 功能
+
+- **铁路网络编辑**：创建、拖动和重命名站点，按站点顺序绘制线路，调整线路名称、颜色和站点组成，自动生成平滑线路曲线。
+- **地图画布**：支持拖动平移、滚轮缩放，以及 OpenStreetMap 底图的开关与透明度调节。
+- **Service 管理**：配置名称、列车种别、颜色和车次编号公式（如 `G{100+n*2}`）；支持分组、列表隐藏、复制和反向复制。反向复制会镜像路径与相对时刻，并交换数字站台的奇偶配对。
+- **路径与时刻编排**：支持跨线运行区段，逐站设置停靠、定时通过或自由通过，以及站台、到达和出发时间；可按均速与停站时长生成基础时刻，并校验路径和时刻约束。
+- **发车计划**：支持单独输入发车时刻，或按首班、末班上限和间隔批量生成；支持多个时间范围、跨午夜时刻、预览和重叠班次去重。
+- **运行模拟**：根据线路几何与时刻约束计算列车位置，支持播放、暂停、手动调整模拟时间和 `0.25×` 至 `60×` 倍速；可选中列车并跟随其运行。
+- **信息显示**：提供车站出发大屏、日式发车时刻表和车内信息屏（PID），支持线路与站台筛选、通过列车显示，以及停靠站、下一站和换乘信息。
+- **项目管理**：支持新建项目、手动保存到浏览器本地存储、恢复上次保存的项目，以及 JSON 文件导入与导出。
+
+## 技术栈
+
+- TypeScript、React 19、Next.js 16 App Router。
+- vinext 与 Vite 8 负责开发服务和生产构建。
+- Canvas 2D 绘制铁路网络与列车，Tailwind CSS 4 与自定义 CSS 构建界面。
+- 集成 Cloudflare Workers 构建配置，保留可选的 D1、R2 与 Drizzle 扩展入口。
+
+## 构建与运行
+
+### 环境要求
+
+- Node.js `>=22.13.0`。
+- npm，使用仓库中的 `package-lock.json` 安装依赖。
+- 支持 Canvas 2D 和 localStorage 的现代浏览器。
+
+当前列车可视化功能无需配置环境变量、数据库或登录服务。OpenStreetMap 底图瓦片需要联网加载，可在界面中关闭底图。
+
+### 获取代码与安装依赖
 
 ```bash
-npm install
+git clone https://github.com/XiaoGeNekidoraVibes/TrainTimetableVisualizer.git
+cd TrainTimetableVisualizer
+npm ci
+```
+
+### 本地开发
+
+```bash
 npm run dev
+```
+
+默认访问 [http://localhost:3000](http://localhost:3000)。如需指定端口：
+
+```bash
+npm run dev -- --port 3001
+```
+
+### 生产构建与预览
+
+```bash
 npm run build
+npm start
 ```
 
-This starter does not use `wrangler.jsonc`.
+`npm run build` 通过 vinext 执行生产构建，产物输出到 `dist/`，其中 `dist/client/` 为客户端资源，`dist/server/` 为服务端产物。构建插件还会将托管配置与迁移文件打包到 `dist/.openai/`。
 
-## Included Shape
+`npm start` 启动构建后的生产服务，默认端口为 `3000`。也可以指定监听地址和端口：
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-Signed-in visitors receive both `oai-authenticated-user-id` and `oai-authenticated-user-email`. Private Sites require every visitor to sign in; public Sites may also have anonymous visitors, for whom neither header is present.
-
-The user ID is stable for the same user on the same Site and different across Sites. Email and name are intended for display or contact purposes.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const userId = requestHeaders.get("oai-authenticated-user-id");
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
+```bash
+npm start -- --hostname 127.0.0.1 --port 3001
 ```
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+### 检查与测试
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+```bash
+npm run test:platform
+npm run test:departures
+npm run lint
+```
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+- `test:platform`：验证站台规则、反向运行方案、车站看板、车内信息屏和列车跟随逻辑。
+- `test:departures`：验证批量发车范围、跨午夜时刻、重叠去重和发车计划保存逻辑。
+- `lint`：运行 ESLint 检查。
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+当前 `npm test` 仍指向脚手架遗留的加载骨架页面测试，与现有 Rail Flow 页面不匹配；验证当前列车业务请使用上述两个专项测试命令。
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+## 基本使用
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+1. 打开页面后先查看示例网络，或点击“新建”创建空白项目。
+2. 使用“站点”工具在画布中摆放站点，再使用“线路”工具依次选择至少两个站点，按 `Enter` 完成线路。
+3. 新建 Service，配置运行区段、发车计划、停靠或通过规则和站台。站点时刻使用相对于该班次始发时间的 `HH:MM:SS`。
+4. 调整顶部模拟时钟与倍速，查看列车运行；选中站点可打开车站看板，选中列车可查看车内信息屏并开启跟随。
+5. 点击“保存”或按 `Ctrl+S` / `Cmd+S` 保存到当前浏览器；需要备份或跨浏览器迁移时使用“导出”。导入 JSON 后需再次保存，才能在下次打开时恢复。
 
-## Useful Commands
+“保存”会将项目写入当前网站的浏览器本地存储（localStorage），需手动触发；更换域名、端口或浏览器后，本地存档不会自动共享。导出的文件名为 `rail-flow-project.json`。
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+### 批量发车格式
 
-## Learn More
+在 Service 的“按时间范围批量添加”面板中，每行输入一个范围，三个字段均使用 `HH:MM:SS`，依次为首班时刻、末班上限和发车间隔：
 
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+```text
+06:30:00, 09:00:00, 00:15:00
+17:00:00, 19:00:00, 00:10:00
+23:30:00, 25:00:00, 00:30:00
+```
+
+从首班起按间隔生成，只有恰好落在末班上限的班次才会包含该上限。跨午夜使用 `24:00:00` 及之后的时刻，时刻小时范围为 `00` 至 `47`。多个范围与单独发车时刻合并后会排序并去重。
+
+### 快捷键
+
+| 按键 | 操作 |
+| --- | --- |
+| `V` | 切换到选择工具 |
+| `S` | 切换到站点工具 |
+| `L` | 切换到线路工具 |
+| `Enter` | 完成当前线路 |
+| `Esc` | 取消线路绘制或退出列车跟随 |
+| `Space` | 播放或暂停模拟 |
+| `Ctrl+S` / `Cmd+S` | 保存项目到当前浏览器 |
+
+## 项目结构
+
+```text
+app/
+  components/       画布、编辑器、车站看板与车内信息屏
+  domain/           数据模型、路径几何、时刻编排与运行模拟
+  lib/              时间解析与格式化
+  page.tsx          应用入口
+  layout.tsx        页面布局与元信息
+public/             静态资源与字体
+tests/              业务测试与遗留脚手架测试
+worker/             Cloudflare Worker 入口
+build/              构建插件
+.openai/            托管与可选资源绑定配置
+db/                 可选数据库入口与 schema
+drizzle/            数据库迁移文件
+examples/d1/        D1 数据库接入示例
+```
+
+当前 `.openai/hosting.json` 中的 D1、R2 绑定均未启用，`db/schema.ts` 为空。若后续接入 D1，可参考 `examples/d1/`，定义 schema 后运行 `npm run db:generate` 生成迁移；数据库绑定与迁移应用需由相应托管环境配置。
